@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 自定义工具类 */
+@layer utilities {
+  .content-auto {
+    content-visibility: auto;
+  }
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* 基础样式扩展 */
+@layer base {
+  body {
+    @apply bg-neutral-100 text-neutral-800 font-sans;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-bold text-neutral-900;
+  }
+}
+
+/* 组件样式 */
+@layer components {
+  .btn-primary {
+    @apply bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 transition-colors;
+  }
+  .btn-outline {
+    @apply border border-neutral-300 px-4 py-2 rounded-md hover:bg-neutral-100 transition-colors;
+  }
+  .card-minimal {
+    @apply border border-neutral-200 rounded-md bg-white p-4 hover:border-neutral-300 transition-colors;
+  }
+}

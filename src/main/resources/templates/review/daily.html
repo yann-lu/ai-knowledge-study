@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>今日复习 - 艾宾浩斯记忆法</title>
+    <link rel="stylesheet" th:href="@{/css/output.css}">
+</head>
+<body class="bg-neutral-50 min-h-screen flex flex-col">
+    <!-- 顶部导航栏 -->
+    <header class="sticky top-0 z-30 bg-gradient-to-r from-blue-500 to-purple-500 shadow">
+        <nav class="max-w-7xl mx-auto flex items-center justify-between px-6 py-3">
+            <div class="text-2xl font-extrabold tracking-tight text-white select-none">艾宾浩斯记忆法</div>
+            <ul class="flex space-x-6 text-white font-medium text-base">
+                <li><a href="/" class="hover:opacity-80">首页</a></li>
+                <li><a href="/knowledge" class="hover:opacity-80">复习知识库</a></li>
+                <li><a href="/review" class="border-b-2 border-white pb-1">今日复习</a></li>
+                <li><a href="/category" class="hover:opacity-80">分类管理</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="flex-1 w-full max-w-4xl mx-auto px-4 py-10">
+        <h2 class="text-2xl font-bold text-gray-800 mb-8 text-center">今日复习计划</h2>
+        <div th:if="${reviewPlans == null or reviewPlans.empty}" class="text-center py-20">
+            <div class="text-6xl text-gray-300 mb-4">🎉</div>
+            <p class="text-lg text-gray-500 mb-4">今日暂无需要复习的知识点，继续加油！</p>
+            <a href="/knowledge/new" class="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium shadow hover:bg-blue-700 transition">添加新知识点</a>
+        </div>
+        <div th:if="${reviewPlans != null and !reviewPlans.empty}" class="space-y-8">
+            <div th:each="plan,iter : ${reviewPlans}" class="bg-white rounded-2xl shadow-md hover:shadow-xl transition p-6 flex flex-col">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded" th:text="${plan.reviewStage}"></span>
+                        <span class="text-xs text-gray-400" th:text="${#temporals.format(plan.scheduledDate, 'yyyy-MM-dd')}"></span>
+                    </div>
+                    
+                </div>
+                <h3 class="text-lg font-bold text-gray-800 mb-2" th:text="${plan.title}"></h3>
+
+                <div class="text-gray-600 text-sm mb-4" th:text="${#strings.abbreviate(plan.content, 150)}"></div>
+                <div class="flex gap-2 mt-2">
+                    <form th:action="@{/review/complete}" method="post" th:object="${plan}">
+                        <input type="hidden" th:name="id" th:value="${plan.id}" />
+                        <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-600 transition">标记为已复习</button>
+                    </form>
+                    <a th:href="@{/knowledge/{id}(id=${plan.knowledgeId})}" class="bg-blue-50 text-blue-600 px-4 py-2 rounded-lg font-medium hover:bg-blue-100 transition">查看详情</a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-white border-t border-neutral-200 py-6 mt-8">
+        <div class="max-w-7xl mx-auto px-4 text-center text-neutral-400 text-sm">
+            艾宾浩斯记忆法知识库 &copy; 2024
+        </div>
+    </footer>
+</body>
+</html>

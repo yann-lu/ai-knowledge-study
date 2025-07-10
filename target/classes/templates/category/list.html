@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分类管理 - 艾宾浩斯记忆法</title>
+    <link rel="stylesheet" th:href="@{/css/output.css}">
+</head>
+<body class="bg-neutral-50 min-h-screen flex flex-col">
+    <!-- 顶部导航栏 -->
+    <header class="sticky top-0 z-30 bg-gradient-to-r from-blue-500 to-purple-500 shadow">
+        <nav class="max-w-7xl mx-auto flex items-center justify-between px-6 py-3">
+            <div class="text-2xl font-extrabold tracking-tight text-white select-none">艾宾浩斯记忆法</div>
+            <ul class="flex space-x-6 text-white font-medium text-base">
+                <li><a href="/" class="hover:opacity-80">首页</a></li>
+                <li><a href="/knowledge" class="hover:opacity-80">复习知识库</a></li>
+                <li><a href="/review" class="hover:opacity-80">今日复习</a></li>
+                <li><a href="/category" class="border-b-2 border-white pb-1">分类管理</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="flex-1 w-full max-w-4xl mx-auto px-4 py-10">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+            <h2 class="text-2xl font-bold text-gray-800">分类管理</h2>
+            <a href="/category/new" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium shadow hover:bg-blue-700 transition">➕ 新建分类</a>
+        </div>
+        <div class="bg-white rounded-2xl shadow-md p-6">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead>
+                    <tr>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">分类名称</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">上级分类</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    <tr th:each="category : ${categories}">
+                        <td class="px-4 py-2 text-gray-800" th:text="${category.name}"></td>
+                        <td class="px-4 py-2 text-gray-500" th:text="${category.parent != null ? category.parent.name : '无'}"></td>
+                        <td class="px-4 py-2">
+                            <a th:href="@{/category/{id}(id=${category.id})}" class="text-blue-600 hover:underline mr-4">查看</a>
+                            <a th:href="@{/category/{id}/edit(id=${category.id})}" class="text-gray-600 hover:underline mr-4">编辑</a>
+                            <form th:action="@{/category/{id}/delete(id=${category.id})}" method="post" class="inline">
+                                <button type="submit" class="text-red-500 hover:underline bg-transparent border-none cursor-pointer" onclick="return confirm('确定要删除该分类吗？')">删除</button>
+                            </form>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <div th:if="${categories == null or categories.empty}" class="text-center text-gray-400 py-12">
+                暂无分类，请先新建分类。
+            </div>
+        </div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-white border-t border-neutral-200 py-6 mt-8">
+        <div class="max-w-7xl mx-auto px-4 text-center text-neutral-400 text-sm">
+            艾宾浩斯记忆法知识库 &copy; 2024
+        </div>
+    </footer>
+</body>
+</html> 
