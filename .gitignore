@@ -1,0 +1,8 @@
+.idea/
+.vscode/
+node_modules/
+target/
+package-lock.json
+.DS_Store
+*.log
+*.tmp
