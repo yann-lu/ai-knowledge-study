@@ -1,5 +1,6 @@
 package com.memory.app.service;
 
+import com.memory.app.dto.CategoryDTO;
 import com.memory.app.model.Category;
 
 import java.util.List;
@@ -24,7 +25,7 @@ public interface CategoryService {
     List<Category> findByParentId(Long parentId);
     
     // 获取分类树（递归结构）
-    List<Category> getCategoryTree();
+    List<CategoryDTO> getCategoryTree();
     
     // 获取分类树（Map结构，用于前端渲染）
     Map<String, Object> getCategoryTreeMap();
@@ -37,4 +38,22 @@ public interface CategoryService {
     
     // 获取分类路径（从根到指定分类）
     List<Category> getCategoryPath(Long id);
-} 
+    
+    // 将Category转换为CategoryDTO
+    CategoryDTO convertToCategoryDTO(Category category);
+    
+    // 将Category列表转换为CategoryDTO列表
+    List<CategoryDTO> convertToCategoryDTOList(List<Category> categories);
+    
+    // 根据ID查找分类并返回DTO
+    Optional<CategoryDTO> findByIdAsDTO(Long id);
+    
+    // 查找所有分类并返回DTO列表
+    List<CategoryDTO> findAllAsDTO();
+    
+    // 查找所有顶级分类并返回DTO列表
+    List<CategoryDTO> findAllTopLevelAsDTO();
+    
+    // 查找指定父分类的所有子分类并返回DTO列表
+    List<CategoryDTO> findByParentIdAsDTO(Long parentId);
+}

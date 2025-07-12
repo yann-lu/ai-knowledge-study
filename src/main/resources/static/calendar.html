@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>复习日历 - 艾宾浩斯记忆法知识库</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .calendar-day {
+            min-height: 120px;
+            transition: all 0.3s ease;
+        }
+        .calendar-day:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .review-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin: 1px;
+        }
+        .review-count {
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+        .modal-overlay {
+            backdrop-filter: blur(4px);
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-purple-400 via-pink-500 to-red-500 min-h-screen">
+    <div id="app">
+        <!-- 导航栏 -->
+        <nav class="bg-white bg-opacity-20 backdrop-blur-lg border-b border-white border-opacity-20">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-center h-16">
+                    <div class="flex space-x-8">
+                        <a href="/knowledge.html" class="flex items-center px-3 py-2 text-white hover:text-yellow-300 transition-colors duration-200">
+                            复习知识库
+                        </a>
+                        <a href="/review.html" class="flex items-center px-3 py-2 text-white hover:text-yellow-300 transition-colors duration-200">
+                            今日复习
+                        </a>
+                        <a href="/calendar.html" class="flex items-center px-3 py-2 text-yellow-300 border-b-2 border-yellow-300 transition-colors duration-200">
+                            复习日历
+                        </a>
+                        <a href="/category.html" class="flex items-center px-3 py-2 text-white hover:text-yellow-300 transition-colors duration-200">
+                            分类管理
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- 主要内容 -->
+        <div class="max-w-7xl mx-auto px-4 py-8">
+            <!-- 页面标题和控制 -->
+            <div class="mb-8">
+                <h1 class="text-3xl font-bold text-white mb-6">📅 复习日历</h1>
+                
+                <!-- 月份导航 -->
+                <div class="flex items-center justify-between bg-white bg-opacity-20 backdrop-blur-lg rounded-lg p-4 mb-6">
+                    <button @click="previousMonth" class="bg-white bg-opacity-30 text-white px-4 py-2 rounded-lg hover:bg-opacity-50 transition">
+                        ← 上个月
+                    </button>
+                    
+                    <div class="text-center">
+                        <h2 class="text-2xl font-bold text-white">{{ currentYear }}年{{ currentMonth }}月</h2>
+                        <div class="text-sm text-white opacity-80 mt-1">
+                            本月复习: {{ monthlyStats.total }} 次 | 
+                            已完成: {{ monthlyStats.completed }} 次 | 
+                            待复习: {{ monthlyStats.pending }} 次
+                        </div>
+                    </div>
+                    
+                    <button @click="nextMonth" class="bg-white bg-opacity-30 text-white px-4 py-2 rounded-lg hover:bg-opacity-50 transition">
+                        下个月 →
+                    </button>
+                </div>
+            </div>
+
+            <!-- 日历网格 -->
+            <div class="bg-white rounded-lg shadow-xl overflow-hidden">
+                <!-- 星期标题 -->
+                <div class="grid grid-cols-7 bg-gray-100">
+                    <div v-for="day in weekDays" :key="day" class="p-4 text-center font-semibold text-gray-700">
+                        {{ day }}
+                    </div>
+                </div>
+                
+                <!-- 日期网格 -->
+                <div class="grid grid-cols-7">
+                    <!-- 前一个月的空白日期 -->
+                    <div v-for="blank in firstDayOfWeek" :key="'blank-' + blank" class="calendar-day border border-gray-200 bg-gray-50">
+                    </div>
+                    
+                    <!-- 当前月的日期 -->
+                    <div v-for="date in daysInMonth" :key="date" 
+                         class="calendar-day border border-gray-200 p-2 cursor-pointer relative"
+                         :class="{
+                             'bg-blue-50': isToday(date),
+                             'bg-white': !isToday(date),
+                             'hover:bg-gray-50': !isToday(date)
+                         }"
+                         @click="showDayDetails(date)">
+                        
+                        <!-- 日期数字 -->
+                        <div class="text-lg font-semibold mb-2"
+                             :class="{
+                                 'text-blue-600': isToday(date),
+                                 'text-gray-900': !isToday(date)
+                             }">
+                            {{ date }}
+                        </div>
+                        
+                        <!-- 复习计划指示器 -->
+                        <div v-if="getDayData(date)" class="space-y-1">
+                            <!-- 复习数量统计 -->
+                            <div class="flex items-center justify-between text-xs">
+                                <span class="review-count text-blue-600">{{ getDayData(date).total }}个复习</span>
+                            </div>
+                            
+                            <!-- 状态点 -->
+                            <div class="flex flex-wrap">
+                                <!-- 已完成 -->
+                                <div v-for="n in getDayData(date).completed" :key="'completed-' + n" 
+                                     class="review-dot bg-green-500" title="已完成">
+                                </div>
+                                <!-- 待复习 -->
+                                <div v-for="n in getDayData(date).pending" :key="'pending-' + n" 
+                                     class="review-dot bg-yellow-500" title="待复习">
+                                </div>
+                                <!-- 失败 -->
+                                <div v-for="n in getDayData(date).failed" :key="'failed-' + n" 
+                                     class="review-dot bg-red-500" title="复习失败">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 图例 -->
+            <div class="mt-6 bg-white bg-opacity-20 backdrop-blur-lg rounded-lg p-4">
+                <h3 class="text-lg font-semibold text-white mb-3">图例说明</h3>
+                <div class="flex flex-wrap gap-6 text-sm text-white">
+                    <div class="flex items-center">
+                        <div class="review-dot bg-green-500 mr-2"></div>
+                        <span>已完成复习</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="review-dot bg-yellow-500 mr-2"></div>
+                        <span>待复习</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="review-dot bg-red-500 mr-2"></div>
+                        <span>复习失败</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-4 h-4 bg-blue-50 border border-blue-200 rounded mr-2"></div>
+                        <span>今天</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 日期详情模态框 -->
+        <div v-if="showModal" class="fixed inset-0 bg-black bg-opacity-50 modal-overlay flex items-center justify-center z-50 p-4" @click="closeModal">
+            <div class="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] flex flex-col overflow-hidden shadow-2xl" @click.stop>
+                <!-- 模态框头部 -->
+                <div class="bg-gradient-to-r from-blue-50 to-purple-50 px-6 py-4 border-b flex justify-between items-center">
+                    <h3 class="text-xl font-bold text-gray-800">
+                        {{ currentYear }}年{{ currentMonth }}月{{ selectedDate }}日 - 复习计划
+                    </h3>
+                    <button @click="closeModal" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                </div>
+                
+                <!-- 可滚动内容区域 -->
+                <div class="flex-1 overflow-y-auto p-6">
+                    <div v-if="selectedDayData && selectedDayData.reviews.length > 0">
+                        <!-- 统计信息 -->
+                        <div class="grid grid-cols-3 gap-4 mb-6">
+                            <div class="text-center p-3 bg-blue-50 rounded-lg">
+                                <div class="text-2xl font-bold text-blue-600">{{ selectedDayData.total }}</div>
+                                <div class="text-sm text-gray-600">总复习数</div>
+                            </div>
+                            <div class="text-center p-3 bg-green-50 rounded-lg">
+                                <div class="text-2xl font-bold text-green-600">{{ selectedDayData.completed }}</div>
+                                <div class="text-sm text-gray-600">已完成</div>
+                            </div>
+                            <div class="text-center p-3 bg-yellow-50 rounded-lg">
+                                <div class="text-2xl font-bold text-yellow-600">{{ selectedDayData.pending }}</div>
+                                <div class="text-sm text-gray-600">待复习</div>
+                            </div>
+                        </div>
+                        
+                        <!-- 复习列表 -->
+                        <div class="space-y-3">
+                            <div v-for="review in selectedDayData.reviews" :key="review.id" 
+                                 class="border rounded-lg p-4 hover:shadow-md transition-shadow"
+                                 :class="{
+                                     'border-green-200 bg-green-50': review.status === 'COMPLETED',
+                                     'border-yellow-200 bg-yellow-50': review.status === 'PENDING',
+                                     'border-red-200 bg-red-50': review.status === 'FAILED'
+                                 }">
+                                <div class="flex justify-between items-start">
+                                    <div class="flex-1">
+                                        <h4 class="font-semibold text-gray-800 mb-1">{{ review.title }}</h4>
+                                        <div class="text-sm text-gray-600 mb-2">
+                                            第 {{ review.reviewStage }} 阶段复习
+                                        </div>
+                                        <div class="flex items-center space-x-2 text-xs">
+                                            <span v-if="review.status === 'COMPLETED'" class="text-green-600">✅ 已完成</span>
+                                            <span v-else-if="review.status === 'PENDING'" class="text-yellow-600">⏳ 待复习</span>
+                                            <span v-else-if="review.status === 'FAILED'" class="text-red-600">❌ 复习失败</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex space-x-2">
+                                        <button @click="viewKnowledge(review.knowledgeId)" 
+                                                class="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 transition">
+                                            查看详情
+                                        </button>
+                                        <button @click="goToReview(review.knowledgeId)" 
+                                                class="bg-purple-500 text-white px-3 py-1 rounded text-sm hover:bg-purple-600 transition">
+                                            去复习
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div v-else class="text-center py-8">
+                        <div class="text-6xl mb-4">📅</div>
+                        <h3 class="text-lg font-semibold text-gray-700 mb-2">这一天没有复习计划</h3>
+                        <p class="text-gray-500">可以休息一下，或者添加新的知识点</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    currentYear: new Date().getFullYear(),
+                    currentMonth: new Date().getMonth() + 1,
+                    calendarData: {},
+                    monthlyStats: {
+                        total: 0,
+                        completed: 0,
+                        pending: 0,
+                        failed: 0
+                    },
+                    weekDays: ['周日', '周一', '周二', '周三', '周四', '周五', '周六'],
+                    showModal: false,
+                    selectedDate: null,
+                    selectedDayData: null,
+                    loading: false
+                }
+            },
+            computed: {
+                daysInMonth() {
+                    return new Date(this.currentYear, this.currentMonth, 0).getDate();
+                },
+                firstDayOfWeek() {
+                    return new Date(this.currentYear, this.currentMonth - 1, 1).getDay();
+                }
+            },
+            async mounted() {
+                await this.loadCalendarData();
+            },
+            methods: {
+                async loadCalendarData() {
+                    try {
+                        this.loading = true;
+                        const response = await fetch(`/api/reviews/calendar?year=${this.currentYear}&month=${this.currentMonth}`);
+                        const data = await response.json();
+                        
+                        this.calendarData = data.dailyData || {};
+                        this.monthlyStats = data.monthlyStats || {
+                            total: 0,
+                            completed: 0,
+                            pending: 0,
+                            failed: 0
+                        };
+                    } catch (error) {
+                        console.error('加载日历数据失败:', error);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                
+                async previousMonth() {
+                    if (this.currentMonth === 1) {
+                        this.currentMonth = 12;
+                        this.currentYear--;
+                    } else {
+                        this.currentMonth--;
+                    }
+                    await this.loadCalendarData();
+                },
+                
+                async nextMonth() {
+                    if (this.currentMonth === 12) {
+                        this.currentMonth = 1;
+                        this.currentYear++;
+                    } else {
+                        this.currentMonth++;
+                    }
+                    await this.loadCalendarData();
+                },
+                
+                getDayData(date) {
+                    const dateKey = `${this.currentYear}-${String(this.currentMonth).padStart(2, '0')}-${String(date).padStart(2, '0')}`;
+                    return this.calendarData[dateKey];
+                },
+                
+                isToday(date) {
+                    const today = new Date();
+                    return today.getFullYear() === this.currentYear && 
+                           today.getMonth() + 1 === this.currentMonth && 
+                           today.getDate() === date;
+                },
+                
+                showDayDetails(date) {
+                    this.selectedDate = date;
+                    this.selectedDayData = this.getDayData(date);
+                    this.showModal = true;
+                },
+                
+                closeModal() {
+                    this.showModal = false;
+                    this.selectedDate = null;
+                    this.selectedDayData = null;
+                },
+                
+                viewKnowledge(knowledgeId) {
+                    window.open(`/knowledge-detail.html?id=${knowledgeId}`, '_blank');
+                },
+                
+                goToReview(knowledgeId) {
+                    window.location.href = `/review.html?knowledgeId=${knowledgeId}`;
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
