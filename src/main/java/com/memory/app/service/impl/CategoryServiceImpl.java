@@ -1,6 +1,8 @@
 package com.memory.app.service.impl;
 
+import com.memory.app.dto.CategoryDTO;
 import com.memory.app.model.Category;
+import com.memory.app.model.Knowledge;
 import com.memory.app.repository.CategoryRepository;
 import com.memory.app.service.CategoryService;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +14,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -54,35 +57,44 @@ public class CategoryServiceImpl implements CategoryService {
     }
 
     @Override
-    public List<Category> getCategoryTree() {
-        List<Category> allCategories = categoryRepository.findAll();
+    public List<CategoryDTO> getCategoryTree() {
+        // 获取所有顶级分类（parent为null）
+        List<Category> topCategories = categoryRepository.findByParentIsNullOrderBySortOrderAsc();
         
-        // 按父子关系组织分类
-        Map<Long, List<Category>> childrenMap = allCategories.stream()
-                .filter(c -> c.getParent() != null)
-                .collect(Collectors.groupingBy(c -> c.getParent().getId()));
-        
-        // 设置子分类
-        allCategories.forEach(category -> {
-            List<Category> children = childrenMap.get(category.getId());
-            if (children != null) {
-                category.setChildren(children);
-            }
-        });
-        
-        // 只返回顶级分类（包含其子分类）
-        return allCategories.stream()
-                .filter(c -> c.getParent() == null)
+        // 转换为DTO并递归构建子分类树
+        return topCategories.stream()
+                .map(this::buildCategoryDTOWithChildren)
                 .collect(Collectors.toList());
+    }
+    
+    private CategoryDTO buildCategoryDTOWithChildren(Category category) {
+        CategoryDTO dto = new CategoryDTO(
+                category.getId(),
+                category.getName(),
+                category.getParent() != null ? category.getParent().getId() : null,
+                category.getLevel(),
+                category.getSortOrder(),
+                category.getCreateTime(),
+                category.getUpdateTime()
+        );
+        
+        // 获取并转换子分类
+        List<Category> children = categoryRepository.findByParentIdOrderBySortOrderAsc(category.getId());
+        List<CategoryDTO> childrenDTO = children.stream()
+                .map(this::buildCategoryDTOWithChildren)
+                .collect(Collectors.toList());
+        dto.setChildren(childrenDTO);
+        
+        return dto;
     }
 
     @Override
     public Map<String, Object> getCategoryTreeMap() {
-        List<Category> categoryTree = getCategoryTree();
+        List<CategoryDTO> categoryTree = getCategoryTree();
         return buildCategoryTreeMap(categoryTree);
     }
 
-    private Map<String, Object> buildCategoryTreeMap(List<Category> categories) {
+    private Map<String, Object> buildCategoryTreeMap(List<CategoryDTO> categories) {
         Map<String, Object> result = new HashMap<>();
         result.put("categories", categories.stream().map(category -> {
             Map<String, Object> node = new HashMap<>();
@@ -90,6 +102,17 @@ public class CategoryServiceImpl implements CategoryService {
             node.put("name", category.getName());
             node.put("level", category.getLevel());
             node.put("sortOrder", category.getSortOrder());
+            
+            // 获取知识点统计信息
+            Optional<Category> categoryEntity = categoryRepository.findById(category.getId());
+            if (categoryEntity.isPresent()) {
+                Set<Knowledge> knowledgeSet = categoryEntity.get().getKnowledgeSet();
+                node.put("knowledgeSet", knowledgeSet);
+                node.put("knowledgeCount", knowledgeSet.size());
+            } else {
+                node.put("knowledgeSet", new ArrayList<>());
+                node.put("knowledgeCount", 0);
+            }
             
             if (!category.getChildren().isEmpty()) {
                 node.put("children", buildCategoryTreeMap(category.getChildren()).get("categories"));
@@ -116,4 +139,44 @@ public class CategoryServiceImpl implements CategoryService {
     public List<Category> getCategoryPath(Long id) {
         return categoryRepository.findCategoryPathById(id);
     }
-} 
+    
+    @Override
+    public CategoryDTO convertToCategoryDTO(Category category) {
+        return new CategoryDTO(
+                category.getId(),
+                category.getName(),
+                category.getParent() != null ? category.getParent().getId() : null,
+                category.getLevel(),
+                category.getSortOrder(),
+                category.getCreateTime(),
+                category.getUpdateTime()
+        );
+    }
+    
+    @Override
+    public List<CategoryDTO> convertToCategoryDTOList(List<Category> categories) {
+        return categories.stream()
+                .map(this::convertToCategoryDTO)
+                .collect(Collectors.toList());
+    }
+    
+    @Override
+    public Optional<CategoryDTO> findByIdAsDTO(Long id) {
+        return findById(id).map(this::convertToCategoryDTO);
+    }
+    
+    @Override
+    public List<CategoryDTO> findAllAsDTO() {
+        return convertToCategoryDTOList(findAll());
+    }
+    
+    @Override
+    public List<CategoryDTO> findAllTopLevelAsDTO() {
+        return convertToCategoryDTOList(findAllTopLevel());
+    }
+    
+    @Override
+    public List<CategoryDTO> findByParentIdAsDTO(Long parentId) {
+        return convertToCategoryDTOList(findByParentId(parentId));
+    }
+}

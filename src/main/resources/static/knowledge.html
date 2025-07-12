@@ -1,0 +1,1404 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>知识库 - 艾宾浩斯记忆助手</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .tree-select {
+            position: relative;
+        }
+        .tree-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            z-index: 50;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .tree-node {
+            padding: 0.5rem;
+            cursor: pointer;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .tree-node:hover {
+            background-color: #f9fafb;
+        }
+        .tree-node.selected {
+            background-color: #dbeafe;
+            color: #1d4ed8;
+        }
+        .tree-node-content {
+            display: flex;
+            align-items: center;
+        }
+        .tree-node-indent {
+            width: 1rem;
+        }
+        .tree-node-toggle {
+            width: 1rem;
+            height: 1rem;
+            margin-right: 0.5rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .tree-node-label {
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .knowledge-card {
+            transition: all 0.2s ease;
+        }
+        .knowledge-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-purple-400 via-pink-500 to-red-500 min-h-screen">
+    <div id="app">
+        <!-- 导航栏 -->
+        <nav class="bg-white bg-opacity-20 backdrop-blur-lg border-b border-white border-opacity-20">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-center h-16">
+                    <div class="flex space-x-8">
+                        <a href="/knowledge.html" class="flex items-center px-3 py-2 text-yellow-300 border-b-2 border-yellow-300 transition-colors duration-200">
+                            复习知识库
+                        </a>
+                        <a href="/review.html" class="flex items-center px-3 py-2 text-white hover:text-yellow-300 transition-colors duration-200">
+                            今日复习
+                        </a>
+                        <a href="/calendar.html" class="flex items-center px-3 py-2 text-white hover:text-yellow-300 transition-colors duration-200">
+                            复习日历
+                        </a>
+                        <a href="/category.html" class="flex items-center px-3 py-2 text-white hover:text-yellow-300 transition-colors duration-200">
+                            分类管理
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- 主要内容区域 -->
+        <div class="max-w-7xl mx-auto px-4 py-8">
+            <!-- 页面标题和操作按钮 -->
+            <div class="flex justify-between items-center mb-8">
+                <h1 class="text-3xl font-bold text-gray-900">知识库</h1>
+                <div class="flex space-x-4">
+                    <button @click="showUploadModal = true" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2">
+                        <span>📁</span>
+                        <span>上传文件</span>
+                    </button>
+                    <button @click="showAddModal = true" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2">
+                        <span>➕</span>
+                        <span>添加知识点</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 筛选和搜索区域 -->
+            <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <!-- 分类树形选择器 -->
+                    <div class="tree-select">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">选择分类</label>
+                        <div class="relative">
+                            <input 
+                                type="text" 
+                                v-model="selectedCategoryText"
+                                @click="toggleCategoryDropdown"
+                                readonly
+                                placeholder="选择分类..."
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                            >
+                            <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </div>
+                            
+                            <!-- 树形下拉框 -->
+                            <div v-if="showCategoryDropdown" class="tree-dropdown">
+                                <div class="p-2 border-b">
+                                    <input 
+                                        type="text" 
+                                        v-model="categorySearchText"
+                                        placeholder="搜索分类..."
+                                        class="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    >
+                                </div>
+                                <div class="tree-node" @click="selectCategory(null)">
+                                    <div class="tree-node-content">
+                                        <span class="tree-node-label">全部分类</span>
+                                    </div>
+                                </div>
+                                <tree-node 
+                                    v-for="category in filteredCategories" 
+                                    :key="category.id"
+                                    :node="category"
+                                    :level="0"
+                                    :selected-id="selectedCategoryId"
+                                    @select="selectCategory"
+                                    @toggle="toggleCategory"
+                                ></tree-node>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 关键词搜索 -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">关键词搜索</label>
+                        <input 
+                            type="text" 
+                            v-model="searchKeyword"
+                            placeholder="输入关键词搜索知识点..."
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                    </div>
+
+                    <!-- 查询按钮 -->
+                    <div class="flex items-end">
+                        <button 
+                            @click="searchKnowledge"
+                            class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md flex items-center justify-center space-x-2"
+                        >
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                            </svg>
+                            <span>查询</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 数据统计模块 -->
+            <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold text-gray-800 flex items-center">
+                        <span class="mr-2">📊</span>
+                        数据统计
+                        <span v-if="selectedCategoryText !== '全部分类' || searchKeyword.trim()" class="ml-2 text-sm text-gray-500">
+                            (基于当前筛选条件)
+                        </span>
+                    </h2>
+                    <button 
+                        @click="refreshStatistics"
+                        class="text-blue-500 hover:text-blue-700 text-sm px-3 py-1 rounded hover:bg-blue-50 transition-colors flex items-center"
+                        title="刷新统计数据"
+                    >
+                        <span class="mr-1">🔄</span>
+                        刷新
+                    </button>
+                </div>
+                
+                <!-- 统计卡片网格 -->
+                <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
+                    <!-- 总数统计 -->
+                    <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-4 text-white">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-blue-100 text-sm">总知识点</p>
+                                <p class="text-2xl font-bold">{{ statistics.total || 0 }}</p>
+                            </div>
+                            <div class="text-3xl opacity-80">📚</div>
+                        </div>
+                    </div>
+                    
+                    <!-- 未生成复习计划 -->
+                    <div class="bg-gradient-to-r from-gray-500 to-gray-600 rounded-lg p-4 text-white">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-100 text-sm">未生成计划</p>
+                                <p class="text-2xl font-bold">{{ statistics.noReviewPlan || 0 }}</p>
+                            </div>
+                            <div class="text-3xl opacity-80">📝</div>
+                        </div>
+                    </div>
+                    
+                    <!-- 进行中 -->
+                    <div class="bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-lg p-4 text-white">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-yellow-100 text-sm">进行中</p>
+                                <p class="text-2xl font-bold">{{ statistics.inProgress || 0 }}</p>
+                            </div>
+                            <div class="text-3xl opacity-80">🔄</div>
+                        </div>
+                    </div>
+                    
+                    <!-- 已掌握 -->
+                    <div class="bg-gradient-to-r from-green-500 to-green-600 rounded-lg p-4 text-white">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-green-100 text-sm">已掌握</p>
+                                <p class="text-2xl font-bold">{{ statistics.mastered || 0 }}</p>
+                            </div>
+                            <div class="text-3xl opacity-80">✅</div>
+                        </div>
+                    </div>
+                    
+                    <!-- 今日需复习 -->
+                    <div class="bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg p-4 text-white">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-purple-100 text-sm">今日需复习</p>
+                                <p class="text-2xl font-bold">{{ statistics.todayReview || 0 }}</p>
+                            </div>
+                            <div class="text-3xl opacity-80">📅</div>
+                        </div>
+                    </div>
+                    
+                    <!-- 逾期未复习 -->
+                    <div class="bg-gradient-to-r from-red-500 to-red-600 rounded-lg p-4 text-white">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-red-100 text-sm">逾期未复习</p>
+                                <p class="text-2xl font-bold">{{ statistics.overdue || 0 }}</p>
+                            </div>
+                            <div class="text-3xl opacity-80">⚠️</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 详细统计信息 -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- 分类分布 -->
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-sm font-medium text-gray-700 mb-3 flex items-center">
+                            <span class="mr-2">🏷️</span>
+                            分类分布
+                        </h3>
+                        <div class="space-y-2 max-h-32 overflow-y-auto">
+                            <div v-if="!statistics.categoryDistribution || statistics.categoryDistribution.length === 0" class="text-gray-500 text-sm">
+                                暂无数据
+                            </div>
+                            <div v-else v-for="item in statistics.categoryDistribution" :key="item.categoryId" class="flex justify-between items-center text-sm">
+                                <span class="text-gray-600 truncate mr-2">{{ item.categoryName || '未分类' }}</span>
+                                <span class="text-gray-800 font-medium">{{ item.count }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 复习进度分布 -->
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-sm font-medium text-gray-700 mb-3 flex items-center">
+                            <span class="mr-2">📈</span>
+                            复习进度分布
+                        </h3>
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-gray-600">平均完成率</span>
+                                <span class="text-gray-800 font-medium">{{ statistics.averageProgress || 0 }}%</span>
+                            </div>
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-gray-600">完成率 > 80%</span>
+                                <span class="text-gray-800 font-medium">{{ statistics.highProgress || 0 }}</span>
+                            </div>
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-gray-600">完成率 < 50%</span>
+                                <span class="text-gray-800 font-medium">{{ statistics.lowProgress || 0 }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 时间统计 -->
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-sm font-medium text-gray-700 mb-3 flex items-center">
+                            <span class="mr-2">⏰</span>
+                            时间统计
+                        </h3>
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-gray-600">本周新增</span>
+                                <span class="text-gray-800 font-medium">{{ statistics.thisWeekAdded || 0 }}</span>
+                            </div>
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-gray-600">本月新增</span>
+                                <span class="text-gray-800 font-medium">{{ statistics.thisMonthAdded || 0 }}</span>
+                            </div>
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-gray-600">最近活跃</span>
+                                <span class="text-gray-800 font-medium">{{ statistics.recentActive || 0 }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 加载状态 -->
+            <div v-if="loading" class="text-center py-12">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                <p class="text-gray-500 mt-2">加载中...</p>
+            </div>
+
+            <!-- 知识点列表 -->
+            <div v-else>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div 
+                        v-for="knowledge in filteredKnowledge" 
+                        :key="knowledge.id"
+                        class="knowledge-card bg-white rounded-lg shadow-md p-6 cursor-pointer"
+                        @click="viewKnowledge(knowledge)"
+                    >
+                        <h3 class="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">{{ knowledge.title }}</h3>
+                        <p class="text-gray-600 text-sm mb-4 line-clamp-3">{{ getCleanOutline(knowledge.outline) }}</p>
+                        
+                        <!-- 分类标签 -->
+                        <div class="flex flex-wrap gap-2 mb-3">
+                            <span 
+                                v-for="category in knowledge.categories" 
+                                :key="category.id"
+                                class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
+                            >
+                                {{ category.name }}
+                            </span>
+                        </div>
+                        
+                        <!-- 复习状态标签 -->
+                        <div class="flex flex-wrap gap-2 mb-3" v-if="knowledge.reviewStatus">
+                            <!-- 复习计划状态标签 -->
+                            <span 
+                                v-if="!knowledge.reviewStatus.hasReviewPlan"
+                                class="inline-block bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded-full"
+                            >
+                                📝 未生成复习计划
+                            </span>
+                            <span 
+                                v-else-if="knowledge.reviewStatus.reviewStatus === '已掌握'"
+                                class="inline-block bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full"
+                            >
+                                ✅ 已掌握
+                            </span>
+                            <span 
+                                v-else-if="knowledge.reviewStatus.reviewStatus === '进行中'"
+                                class="inline-block bg-yellow-100 text-yellow-700 text-xs px-2 py-1 rounded-full"
+                            >
+                                🔄 进行中
+                            </span>
+                            
+                            <!-- 复习进度标签 -->
+                            <span 
+                                v-if="knowledge.reviewStatus.hasReviewPlan"
+                                class="inline-block bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded-full"
+                            >
+                                📊 {{ knowledge.reviewStatus.completedCount }}/{{ knowledge.reviewStatus.totalCount }}
+                            </span>
+                            
+                            <!-- 生成复习计划按钮 -->
+                            <button 
+                                v-if="!knowledge.reviewStatus.hasReviewPlan"
+                                @click.stop="generateReviewPlan(knowledge.id)"
+                                class="inline-block bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full hover:bg-blue-200 transition-colors"
+                            >
+                                ➕ 生成复习计划
+                            </button>
+                            
+                            <!-- 查看复习计划按钮 -->
+                            <button 
+                                v-if="knowledge.reviewStatus.hasReviewPlan"
+                                @click.stop="viewReviewPlan(knowledge.id)"
+                                class="inline-block bg-indigo-100 text-indigo-700 text-xs px-2 py-1 rounded-full hover:bg-indigo-200 transition-colors"
+                            >
+                                👁️ 查看复习计划
+                            </button>
+                        </div>
+                        
+                        <!-- 操作按钮区域 -->
+                        <div class="flex justify-between items-center mt-4">
+                            <div class="text-xs text-gray-500">
+                                创建时间: {{ formatDate(knowledge.createdAt) }}
+                            </div>
+                            <div class="flex space-x-2">
+                                <!-- 编辑按钮 -->
+                                <button 
+                                    @click.stop="editKnowledge(knowledge.id)"
+                                    class="text-blue-500 hover:text-blue-700 text-xs px-2 py-1 rounded hover:bg-blue-50 transition-colors"
+                                    title="编辑知识点"
+                                >
+                                    ✏️ 编辑
+                                </button>
+                                <!-- 删除按钮 -->
+                                <button 
+                                    @click.stop="deleteKnowledge(knowledge.id, knowledge.title)"
+                                    class="text-red-500 hover:text-red-700 text-xs px-2 py-1 rounded hover:bg-red-50 transition-colors"
+                                    title="删除知识点"
+                                >
+                                    🗑️ 删除
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 分页控件 -->
+                <div v-if="totalPages > 1" class="mt-8 flex flex-col sm:flex-row justify-between items-center bg-white rounded-lg shadow-md p-4">
+                    <!-- 分页信息 -->
+                    <div class="text-sm text-gray-700 mb-4 sm:mb-0">
+                        显示第 {{ (currentPage - 1) * pageSize + 1 }} - {{ Math.min(currentPage * pageSize, totalCount) }} 条，共 {{ totalCount }} 条记录
+                    </div>
+                    
+                    <!-- 分页按钮 -->
+                    <div class="flex items-center space-x-2">
+                        <!-- 首页按钮 -->
+                        <button 
+                            @click="goToFirstPage"
+                            :disabled="currentPage === 1"
+                            class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="首页"
+                        >
+                            ⏮️
+                        </button>
+                        
+                        <!-- 上一页按钮 -->
+                        <button 
+                            @click="goToPrevPage"
+                            :disabled="currentPage === 1"
+                            class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="上一页"
+                        >
+                            ⏪
+                        </button>
+                        
+                        <!-- 页码按钮 -->
+                        <button 
+                            v-for="page in getPageNumbers()" 
+                            :key="page"
+                            @click="changePage(page)"
+                            :class="{
+                                'bg-blue-500 text-white border-blue-500': page === currentPage,
+                                'text-gray-500 bg-white border-gray-300 hover:bg-gray-50': page !== currentPage
+                            }"
+                            class="px-3 py-2 text-sm font-medium border rounded-md transition-colors"
+                        >
+                            {{ page }}
+                        </button>
+                        
+                        <!-- 下一页按钮 -->
+                        <button 
+                            @click="goToNextPage"
+                            :disabled="currentPage === totalPages"
+                            class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="下一页"
+                        >
+                            ⏩
+                        </button>
+                        
+                        <!-- 末页按钮 -->
+                        <button 
+                            @click="goToLastPage"
+                            :disabled="currentPage === totalPages"
+                            class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="末页"
+                        >
+                            ⏭️
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 空状态 -->
+                <div v-if="filteredKnowledge.length === 0 && !loading" class="text-center py-12">
+                    <div class="text-gray-400 text-6xl mb-4">📚</div>
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">暂无知识点</h3>
+                    <p class="text-gray-500">开始添加您的第一个知识点吧！</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 添加知识点模态框 -->
+        <div v-if="showAddModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click="closeAddModal">
+            <div class="bg-white rounded-lg w-[90vw] max-w-6xl h-[85vh] overflow-y-auto p-8 m-4" @click.stop>
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-2xl font-bold text-gray-800">{{ isEditMode ? '编辑知识点' : '添加知识点' }}</h3>
+                    <button @click="closeAddModal" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                </div>
+                
+                <form @submit.prevent="saveKnowledge">
+                    <!-- 标题 -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">标题 *</label>
+                        <input 
+                            type="text" 
+                            v-model="knowledgeForm.title"
+                            required
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="请输入知识点标题"
+                        >
+                    </div>
+                    
+                    <!-- 内容 -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">内容 *</label>
+                        <textarea 
+                            v-model="knowledgeForm.content"
+                            required
+                            rows="15"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y min-h-[300px]"
+                            placeholder="请输入知识点内容（支持Markdown格式）"
+                        ></textarea>
+                    </div>
+                    
+                    <!-- 分类选择 -->
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">选择分类</label>
+                        <div class="tree-select">
+                            <input 
+                                type="text" 
+                                v-model="selectedCategoriesText"
+                                @click="toggleModalCategoryDropdown"
+                                readonly
+                                placeholder="选择分类..."
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                            >
+                            <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </div>
+                            
+                            <!-- 分类下拉框 -->
+                            <div v-if="showModalCategoryDropdown" class="tree-dropdown">
+                                <div class="p-2 border-b">
+                                    <input 
+                                        type="text" 
+                                        v-model="modalCategorySearchText"
+                                        placeholder="搜索分类..."
+                                        class="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    >
+                                </div>
+                                <tree-node 
+                                    v-for="category in filteredModalCategories" 
+                                    :key="category.id"
+                                    :node="category"
+                                    :level="0"
+                                    :selected-id="null"
+                                    @select="toggleCategorySelection"
+                                    @toggle="toggleCategory"
+                                ></tree-node>
+                            </div>
+                        </div>
+                        
+                        <!-- 已选择的分类 -->
+                        <div v-if="knowledgeForm.categoryIds.length > 0" class="mt-2">
+                            <div class="flex flex-wrap gap-2">
+                                <span 
+                                    v-for="categoryId in knowledgeForm.categoryIds" 
+                                    :key="categoryId"
+                                    class="inline-flex items-center bg-blue-100 text-blue-800 text-sm px-2 py-1 rounded"
+                                >
+                                    {{ getCategoryName(categoryId) }}
+                                    <button 
+                                        type="button"
+                                        @click="removeCategorySelection(categoryId)"
+                                        class="ml-1 text-blue-600 hover:text-blue-800"
+                                    >
+                                        ×
+                                    </button>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 按钮 -->
+                    <div class="flex justify-end space-x-4">
+                        <button 
+                            type="button"
+                            @click="closeAddModal"
+                            class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                        >
+                            取消
+                        </button>
+                        <button 
+                            type="submit"
+                            :disabled="saving"
+                            class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50"
+                        >
+                            {{ saving ? (isEditMode ? '更新中...' : '保存中...') : (isEditMode ? '更新' : '保存') }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        // 树节点组件
+        const TreeNode = {
+            name: 'TreeNode',
+            props: ['node', 'level', 'selectedId'],
+            emits: ['select', 'toggle'],
+            template: `
+                <div>
+                    <div 
+                        class="tree-node" 
+                        :class="{ selected: node.id === selectedId }"
+                        @click.stop="$emit('select', node)"
+                    >
+                        <div class="tree-node-content" :style="{ paddingLeft: (level * 20) + 'px' }">
+                            <div 
+                                v-if="node.children && node.children.length > 0"
+                                class="tree-node-toggle"
+                                @click.stop="$emit('toggle', node)"
+                            >
+                                <span v-if="node.expanded">▼</span>
+                                <span v-else>▶</span>
+                            </div>
+                            <div v-else class="tree-node-indent"></div>
+                            <span class="tree-node-label" :title="node.fullPath">{{ node.name }}</span>
+                        </div>
+                    </div>
+                    <tree-node 
+                        v-if="node.expanded && node.children"
+                        v-for="child in node.children" 
+                        :key="child.id"
+                        :node="child"
+                        :level="level + 1"
+                        :selected-id="selectedId"
+                        @select="$emit('select', $event)"
+                        @toggle="$emit('toggle', $event)"
+                    ></tree-node>
+                </div>
+            `
+        };
+
+        createApp({
+            components: {
+                TreeNode
+            },
+            data() {
+                return {
+                    categories: [],
+                    knowledge: [],
+                    filteredKnowledge: [],
+                    selectedCategoryId: null,
+                    selectedCategoryText: '全部分类',
+                    searchKeyword: '',
+                    categorySearchText: '',
+                    showCategoryDropdown: false,
+                    showAddModal: false,
+                    showUploadModal: false,
+                    loading: false,
+                    knowledgeForm: {
+                        id: null,
+                        title: '',
+                        content: '',
+                        categoryIds: []
+                    },
+                    saving: false,
+                    showModalCategoryDropdown: false,
+                    modalCategorySearchText: '',
+                    isEditMode: false,
+                    // 分页相关数据
+                    currentPage: 1,
+                    pageSize: 12,
+                    totalCount: 0,
+                    totalPages: 0,
+                    
+                    // 统计数据
+                    statistics: {
+                        total: 0,
+                        noReviewPlan: 0,
+                        inProgress: 0,
+                        mastered: 0,
+                        todayReview: 0,
+                        overdue: 0,
+                        categoryDistribution: [],
+                        averageProgress: 0,
+                        highProgress: 0,
+                        lowProgress: 0,
+                        thisWeekAdded: 0,
+                        thisMonthAdded: 0,
+                        recentActive: 0
+                    }
+                }
+            },
+            computed: {
+                filteredCategories() {
+                    if (!this.categorySearchText) {
+                        return this.categories;
+                    }
+                    return this.filterCategoriesBySearch(this.categories, this.categorySearchText.toLowerCase());
+                },
+                filteredModalCategories() {
+                    if (!this.modalCategorySearchText) {
+                        return this.categories;
+                    }
+                    return this.filterCategoriesBySearch(this.categories, this.modalCategorySearchText.toLowerCase());
+                },
+                selectedCategoriesText() {
+                    if (this.knowledgeForm.categoryIds.length === 0) {
+                        return '选择分类...';
+                    }
+                    const names = this.knowledgeForm.categoryIds.map(id => this.getCategoryName(id));
+                    return names.join(', ');
+                }
+            },
+            mounted() {
+                this.loadCategories();
+                this.loadKnowledge();
+                this.loadStatistics();
+                this.checkEditMode();
+                // 点击外部关闭下拉框
+                document.addEventListener('click', this.handleClickOutside);
+            },
+            beforeUnmount() {
+                document.removeEventListener('click', this.handleClickOutside);
+            },
+            methods: {
+                async loadCategories() {
+                    try {
+                        const response = await fetch('/api/knowledge/categories/tree');
+                        const data = await response.json();
+                        this.categories = this.processCategories(data);
+                    } catch (error) {
+                        console.error('加载分类失败:', error);
+                    }
+                },
+                async loadKnowledge(page = 1) {
+                    try {
+                        this.loading = true;
+                        const params = new URLSearchParams();
+                        params.append('page', page - 1); // Spring Data JPA页码从0开始，前端从1开始
+                        params.append('size', this.pageSize);
+                        
+                        if (this.selectedCategoryId) {
+                            params.append('categoryId', this.selectedCategoryId);
+                        }
+                        if (this.searchKeyword.trim()) {
+                            params.append('keyword', this.searchKeyword.trim());
+                        }
+                        
+                        const response = await fetch(`/api/knowledge/page?${params.toString()}`);
+                        const data = await response.json();
+                        
+                        this.filteredKnowledge = data.content || [];
+                        this.totalCount = data.totalElements || 0;
+                        this.totalPages = data.totalPages || 0;
+                        this.currentPage = data.number + 1; // Spring Data JPA页码从0开始
+                        
+                        // 为每个知识点加载复习状态
+                        await this.loadReviewStatusForAll();
+                    } catch (error) {
+                        console.error('加载知识点失败:', error);
+                        // 如果分页接口不存在，回退到原有接口
+                        try {
+                            const response = await fetch('/api/knowledge');
+                            const data = await response.json();
+                            this.knowledge = data;
+                            this.filteredKnowledge = this.paginateData(data, page);
+                            this.totalCount = data.length;
+                            this.totalPages = Math.ceil(data.length / this.pageSize);
+                            this.currentPage = page;
+                            await this.loadReviewStatusForAll();
+                        } catch (fallbackError) {
+                            console.error('加载知识点失败:', fallbackError);
+                        }
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                processCategories(categories) {
+                    return categories.map(category => ({
+                        ...category,
+                        expanded: false,
+                        children: category.children ? this.processCategories(category.children) : []
+                    }));
+                },
+                filterCategoriesBySearch(categories, searchText) {
+                    const result = [];
+                    for (const category of categories) {
+                        if (category.name.toLowerCase().includes(searchText)) {
+                            result.push(category);
+                        } else if (category.children && category.children.length > 0) {
+                            const filteredChildren = this.filterCategoriesBySearch(category.children, searchText);
+                            if (filteredChildren.length > 0) {
+                                result.push({
+                                    ...category,
+                                    children: filteredChildren,
+                                    expanded: true
+                                });
+                            }
+                        }
+                    }
+                    return result;
+                },
+                toggleCategoryDropdown() {
+                    this.showCategoryDropdown = !this.showCategoryDropdown;
+                },
+                selectCategory(category) {
+                    if (category) {
+                        this.selectedCategoryId = category.id;
+                        this.selectedCategoryText = category.fullPath || category.name;
+                    } else {
+                        this.selectedCategoryId = null;
+                        this.selectedCategoryText = '全部分类';
+                    }
+                    this.showCategoryDropdown = false;
+                    this.searchKnowledge();
+                },
+                toggleCategory(category) {
+                    category.expanded = !category.expanded;
+                },
+                async searchKnowledge() {
+                    this.currentPage = 1; // 重置到第一页
+                    await this.loadKnowledge(1);
+                    await this.loadStatistics();
+                },
+                viewKnowledge(knowledge) {
+                    // 跳转到知识点详情页
+                    window.location.href = `/knowledge/${knowledge.id}`;
+                },
+                formatDate(dateString) {
+                    if (!dateString) return '';
+                    const date = new Date(dateString);
+                    return date.toLocaleDateString('zh-CN');
+                },
+                getCleanOutline(outline) {
+                    if (!outline) return '暂无大纲';
+                    // 移除Markdown标记，只保留纯文本
+                    return outline
+                        .replace(/#{1,6}\s+/g, '') // 移除标题标记
+                        .replace(/\*\*(.+?)\*\*/g, '$1') // 移除粗体标记
+                        .replace(/\*(.+?)\*/g, '$1') // 移除斜体标记
+                        .replace(/`(.+?)`/g, '$1') // 移除代码标记
+                        .replace(/\[(.+?)\]\(.+?\)/g, '$1') // 移除链接，保留文本
+                        .replace(/^[-*+]\s+/gm, '') // 移除列表标记
+                        .replace(/^\d+\.\s+/gm, '') // 移除有序列表标记
+                        .replace(/\n+/g, ' ') // 将换行符替换为空格
+                        .trim();
+                },
+                handleClickOutside(event) {
+                    if (!event.target.closest('.tree-select')) {
+                        this.showCategoryDropdown = false;
+                        this.showModalCategoryDropdown = false;
+                    }
+                },
+                closeAddModal() {
+                    this.showAddModal = false;
+                    this.showModalCategoryDropdown = false;
+                    this.knowledgeForm = {
+                        id: null,
+                        title: '',
+                        content: '',
+                        categoryIds: []
+                    };
+                    this.modalCategorySearchText = '';
+                    if (this.isEditMode) {
+                        // 如果是编辑模式，关闭时清除URL参数并重置编辑模式
+                        window.history.replaceState({}, '', '/knowledge.html');
+                        this.isEditMode = false;
+                    }
+                },
+                toggleModalCategoryDropdown() {
+                    this.showModalCategoryDropdown = !this.showModalCategoryDropdown;
+                },
+                toggleCategorySelection(category) {
+                    const categoryId = category.id;
+                    const index = this.knowledgeForm.categoryIds.indexOf(categoryId);
+                    if (index > -1) {
+                        this.knowledgeForm.categoryIds.splice(index, 1);
+                    } else {
+                        this.knowledgeForm.categoryIds.push(categoryId);
+                    }
+                },
+                removeCategorySelection(categoryId) {
+                    const index = this.knowledgeForm.categoryIds.indexOf(categoryId);
+                    if (index > -1) {
+                        this.knowledgeForm.categoryIds.splice(index, 1);
+                    }
+                },
+                getCategoryName(categoryId) {
+                    const category = this.findCategoryById(categoryId);
+                    return category ? category.name : '未知分类';
+                },
+                findCategoryById(id) {
+                    const findInCategories = (categories) => {
+                        for (const category of categories) {
+                            if (category.id === id) {
+                                return category;
+                            }
+                            if (category.children && category.children.length > 0) {
+                                const found = findInCategories(category.children);
+                                if (found) return found;
+                            }
+                        }
+                        return null;
+                    };
+                    return findInCategories(this.categories);
+                },
+                checkEditMode() {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const editId = urlParams.get('edit');
+                    if (editId) {
+                        this.isEditMode = true;
+                        this.loadKnowledgeForEdit(editId);
+                        this.showAddModal = true;
+                    }
+                },
+                async loadKnowledgeForEdit(knowledgeId) {
+                    try {
+                        const response = await fetch(`/api/knowledge/${knowledgeId}`);
+                        if (response.ok) {
+                            const data = await response.json();
+                            const knowledge = data.knowledge;
+                            this.knowledgeForm = {
+                                id: knowledge.id,
+                                title: knowledge.title,
+                                content: knowledge.content,
+                                categoryIds: knowledge.categories ? knowledge.categories.map(c => c.id) : []
+                            };
+                        } else {
+                            alert('加载知识点失败');
+                            window.location.href = '/knowledge.html';
+                        }
+                    } catch (error) {
+                        console.error('加载知识点失败:', error);
+                        alert('加载知识点失败：' + error.message);
+                        window.location.href = '/knowledge.html';
+                    }
+                },
+                async saveKnowledge() {
+                    if (!this.knowledgeForm.title.trim() || !this.knowledgeForm.content.trim()) {
+                        alert('请填写标题和内容');
+                        return;
+                    }
+
+                    this.saving = true;
+                    try {
+                        const url = this.isEditMode ? `/api/knowledge/${this.knowledgeForm.id}` : '/api/knowledge';
+                        const method = this.isEditMode ? 'PUT' : 'POST';
+                        
+                        const response = await fetch(url, {
+                            method: method,
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                title: this.knowledgeForm.title.trim(),
+                                content: this.knowledgeForm.content.trim(),
+                                categoryIds: this.knowledgeForm.categoryIds
+                            })
+                        });
+
+                        if (response.ok) {
+                            alert(this.isEditMode ? '更新成功！' : '添加成功！');
+                            this.closeAddModal();
+                            // 如果是添加新知识点，回到第一页；如果是编辑，保持当前页
+                            const targetPage = this.isEditMode ? this.currentPage : 1;
+                            this.loadKnowledge(targetPage);
+                            if (this.isEditMode) {
+                                // 清除URL参数并重置编辑模式
+                                window.history.replaceState({}, '', '/knowledge.html');
+                                this.isEditMode = false;
+                            }
+                        } else {
+                            const error = await response.text();
+                            alert((this.isEditMode ? '更新失败：' : '添加失败：') + error);
+                        }
+                    } catch (error) {
+                        console.error(this.isEditMode ? '更新失败:' : '添加失败:', error);
+                        alert((this.isEditMode ? '更新失败：' : '添加失败：') + error.message);
+                    } finally {
+                        this.saving = false;
+                    }
+                },
+                
+                // 为所有知识点加载复习状态
+                async loadReviewStatusForAll() {
+                    try {
+                        const promises = this.filteredKnowledge.map(async (knowledge) => {
+                            const reviewStatus = await this.getReviewStatus(knowledge.id);
+                            knowledge.reviewStatus = reviewStatus;
+                        });
+                        await Promise.all(promises);
+                    } catch (error) {
+                        console.error('加载复习状态失败:', error);
+                    }
+                },
+                
+                // 获取单个知识点的复习状态
+                async getReviewStatus(knowledgeId) {
+                    try {
+                        const response = await fetch(`/api/knowledge/${knowledgeId}/review-status`);
+                        if (response.ok) {
+                            return await response.json();
+                        }
+                    } catch (error) {
+                        console.error(`获取知识点${knowledgeId}复习状态失败:`, error);
+                    }
+                    return null;
+                },
+                
+                // 生成复习计划
+                async generateReviewPlan(knowledgeId) {
+                    try {
+                        const response = await fetch(`/api/reviews/knowledge/${knowledgeId}/generate`, {
+                            method: 'POST'
+                        });
+                        
+                        if (response.ok) {
+                            alert('复习计划生成成功！');
+                            // 重新加载该知识点的复习状态
+                            const knowledge = this.knowledge.find(k => k.id === knowledgeId);
+                            if (knowledge) {
+                                knowledge.reviewStatus = await this.getReviewStatus(knowledgeId);
+                                // 更新filteredKnowledge
+                                const filteredIndex = this.filteredKnowledge.findIndex(k => k.id === knowledgeId);
+                                if (filteredIndex !== -1) {
+                                    this.filteredKnowledge[filteredIndex] = knowledge;
+                                }
+                            }
+                        } else {
+                            const error = await response.text();
+                            alert('生成复习计划失败：' + error);
+                        }
+                    } catch (error) {
+                        console.error('生成复习计划失败:', error);
+                        alert('生成复习计划失败：' + error.message);
+                    }
+                },
+                
+                // 查看复习计划
+                viewReviewPlan(knowledgeId) {
+                    // 跳转到复习页面
+                    window.location.href = `/review.html?knowledgeId=${knowledgeId}`;
+                },
+                
+                // 编辑知识点
+                editKnowledge(knowledgeId) {
+                    // 跳转到编辑页面
+                    window.location.href = `/knowledge.html?edit=${knowledgeId}`;
+                },
+                
+                // 删除知识点
+                async deleteKnowledge(knowledgeId, knowledgeTitle) {
+                    if (!confirm(`确定要删除知识点"${knowledgeTitle}"吗？\n\n注意：删除后将同时删除该知识点的所有复习计划数据，此操作不可恢复！`)) {
+                        return;
+                    }
+                    
+                    try {
+                        const response = await fetch(`/api/knowledge/${knowledgeId}`, {
+                            method: 'DELETE'
+                        });
+                        
+                        if (response.ok) {
+                            alert('删除成功！');
+                            // 重新加载知识点列表
+                            this.loadKnowledge(this.currentPage);
+                        } else {
+                            const error = await response.text();
+                            alert('删除失败：' + error);
+                        }
+                    } catch (error) {
+                        console.error('删除知识点失败:', error);
+                        alert('删除失败：' + error.message);
+                    }
+                },
+                
+                // 分页相关方法
+                async changePage(page) {
+                    if (page < 1 || page > this.totalPages || page === this.currentPage) {
+                        return;
+                    }
+                    await this.loadKnowledge(page);
+                },
+                
+                async goToFirstPage() {
+                    await this.changePage(1);
+                },
+                
+                async goToLastPage() {
+                    await this.changePage(this.totalPages);
+                },
+                
+                async goToPrevPage() {
+                    await this.changePage(this.currentPage - 1);
+                },
+                
+                async goToNextPage() {
+                    await this.changePage(this.currentPage + 1);
+                },
+                
+                // 客户端分页（当后端不支持分页时的回退方案）
+                paginateData(data, page) {
+                    const startIndex = (page - 1) * this.pageSize;
+                    const endIndex = startIndex + this.pageSize;
+                    return data.slice(startIndex, endIndex);
+                },
+                
+                // 获取分页显示的页码列表
+                getPageNumbers() {
+                    const pages = [];
+                    const maxVisible = 5; // 最多显示5个页码
+                    
+                    if (this.totalPages <= maxVisible) {
+                        // 如果总页数不超过最大显示数，显示所有页码
+                        for (let i = 1; i <= this.totalPages; i++) {
+                            pages.push(i);
+                        }
+                    } else {
+                        // 否则显示当前页附近的页码
+                        let start = Math.max(1, this.currentPage - Math.floor(maxVisible / 2));
+                        let end = Math.min(this.totalPages, start + maxVisible - 1);
+                        
+                        // 调整起始位置
+                        if (end - start + 1 < maxVisible) {
+                            start = Math.max(1, end - maxVisible + 1);
+                        }
+                        
+                        for (let i = start; i <= end; i++) {
+                            pages.push(i);
+                        }
+                    }
+                    
+                    return pages;
+                },
+                
+                // 加载统计数据
+                async loadStatistics() {
+                    try {
+                        const params = new URLSearchParams();
+                        
+                        if (this.selectedCategoryId) {
+                            params.append('categoryId', this.selectedCategoryId);
+                        }
+                        if (this.searchKeyword.trim()) {
+                            params.append('keyword', this.searchKeyword.trim());
+                        }
+                        
+                        const response = await fetch(`/api/knowledge/statistics?${params.toString()}`);
+                        if (response.ok) {
+                            this.statistics = await response.json();
+                        } else {
+                            // 如果后端还没有统计接口，使用前端计算
+                            await this.calculateStatisticsFromFrontend();
+                        }
+                    } catch (error) {
+                        console.error('加载统计数据失败:', error);
+                        // 回退到前端计算
+                        await this.calculateStatisticsFromFrontend();
+                    }
+                },
+                
+                // 刷新统计数据
+                async refreshStatistics() {
+                    await this.loadStatistics();
+                },
+                
+                // 前端计算统计数据（当后端接口不可用时的回退方案）
+                async calculateStatisticsFromFrontend() {
+                    try {
+                        // 获取所有知识点数据进行统计
+                        const params = new URLSearchParams();
+                        params.append('page', 0);
+                        params.append('size', 10000); // 获取大量数据用于统计
+                        
+                        if (this.selectedCategoryId) {
+                            params.append('categoryId', this.selectedCategoryId);
+                        }
+                        if (this.searchKeyword.trim()) {
+                            params.append('keyword', this.searchKeyword.trim());
+                        }
+                        
+                        const response = await fetch(`/api/knowledge/page?${params.toString()}`);
+                        let allKnowledge = [];
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            allKnowledge = data.content || [];
+                        } else {
+                            // 回退到原有接口
+                            const fallbackResponse = await fetch('/api/knowledge');
+                            if (fallbackResponse.ok) {
+                                allKnowledge = await fallbackResponse.json();
+                                // 应用筛选条件
+                                if (this.selectedCategoryId || this.searchKeyword.trim()) {
+                                    allKnowledge = this.filterKnowledgeForStatistics(allKnowledge);
+                                }
+                            }
+                        }
+                        
+                        // 为所有知识点加载复习状态
+                        const promises = allKnowledge.map(async (knowledge) => {
+                            const reviewStatus = await this.getReviewStatus(knowledge.id);
+                            knowledge.reviewStatus = reviewStatus;
+                            return knowledge;
+                        });
+                        const knowledgeWithStatus = await Promise.all(promises);
+                        
+                        // 计算统计数据
+                        this.statistics = this.calculateStatistics(knowledgeWithStatus);
+                    } catch (error) {
+                        console.error('前端计算统计数据失败:', error);
+                        // 设置默认值
+                        this.statistics = {
+                            total: 0,
+                            noReviewPlan: 0,
+                            inProgress: 0,
+                            mastered: 0,
+                            todayReview: 0,
+                            overdue: 0,
+                            categoryDistribution: [],
+                            averageProgress: 0,
+                            highProgress: 0,
+                            lowProgress: 0,
+                            thisWeekAdded: 0,
+                            thisMonthAdded: 0,
+                            recentActive: 0
+                        };
+                    }
+                },
+                
+                // 筛选知识点用于统计
+                filterKnowledgeForStatistics(knowledge) {
+                    let filtered = knowledge;
+                    
+                    // 按分类筛选
+                    if (this.selectedCategoryId) {
+                        filtered = filtered.filter(k => 
+                            k.categories && k.categories.some(c => c.id === this.selectedCategoryId)
+                        );
+                    }
+                    
+                    // 按关键词筛选
+                    if (this.searchKeyword.trim()) {
+                        const keyword = this.searchKeyword.trim().toLowerCase();
+                        filtered = filtered.filter(k => 
+                            k.title.toLowerCase().includes(keyword) || 
+                            (k.content && k.content.toLowerCase().includes(keyword))
+                        );
+                    }
+                    
+                    return filtered;
+                },
+                
+                // 计算统计数据
+                calculateStatistics(knowledgeList) {
+                    const now = new Date();
+                    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    const oneWeekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+                    const oneMonthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+                    
+                    let total = knowledgeList.length;
+                    let noReviewPlan = 0;
+                    let inProgress = 0;
+                    let mastered = 0;
+                    let todayReview = 0;
+                    let overdue = 0;
+                    let thisWeekAdded = 0;
+                    let thisMonthAdded = 0;
+                    let recentActive = 0;
+                    
+                    const categoryMap = new Map();
+                    const progressList = [];
+                    
+                    knowledgeList.forEach(knowledge => {
+                        // 复习状态统计
+                        if (!knowledge.reviewStatus || !knowledge.reviewStatus.hasReviewPlan) {
+                            noReviewPlan++;
+                        } else {
+                            const status = knowledge.reviewStatus.reviewStatus;
+                            if (status === '已掌握') {
+                                mastered++;
+                            } else if (status === '进行中') {
+                                inProgress++;
+                            }
+                            
+                            // 计算进度
+                            const progress = knowledge.reviewStatus.totalCount > 0 ? 
+                                Math.round((knowledge.reviewStatus.completedCount / knowledge.reviewStatus.totalCount) * 100) : 0;
+                            progressList.push(progress);
+                        }
+                        
+                        // 分类分布统计
+                        if (knowledge.categories && knowledge.categories.length > 0) {
+                            knowledge.categories.forEach(category => {
+                                const count = categoryMap.get(category.id) || 0;
+                                categoryMap.set(category.id, count + 1);
+                            });
+                        } else {
+                            const count = categoryMap.get('uncategorized') || 0;
+                            categoryMap.set('uncategorized', count + 1);
+                        }
+                        
+                        // 时间统计
+                        if (knowledge.createdAt) {
+                            const createdDate = new Date(knowledge.createdAt);
+                            if (createdDate >= oneWeekAgo) {
+                                thisWeekAdded++;
+                            }
+                            if (createdDate >= oneMonthAgo) {
+                                thisMonthAdded++;
+                            }
+                        }
+                        
+                        // 最近活跃（这里简单定义为最近一周创建的）
+                        if (knowledge.createdAt) {
+                            const createdDate = new Date(knowledge.createdAt);
+                            if (createdDate >= oneWeekAgo) {
+                                recentActive++;
+                            }
+                        }
+                    });
+                    
+                    // 计算进度相关统计
+                    const averageProgress = progressList.length > 0 ? 
+                        Math.round(progressList.reduce((sum, p) => sum + p, 0) / progressList.length) : 0;
+                    const highProgress = progressList.filter(p => p > 80).length;
+                    const lowProgress = progressList.filter(p => p < 50).length;
+                    
+                    // 构建分类分布数组
+                    const categoryDistribution = [];
+                    categoryMap.forEach((count, categoryId) => {
+                        if (categoryId === 'uncategorized') {
+                            categoryDistribution.push({
+                                categoryId: null,
+                                categoryName: '未分类',
+                                count: count
+                            });
+                        } else {
+                            const category = this.findCategoryById(categoryId);
+                            categoryDistribution.push({
+                                categoryId: categoryId,
+                                categoryName: category ? category.name : '未知分类',
+                                count: count
+                            });
+                        }
+                    });
+                    
+                    // 按数量排序
+                    categoryDistribution.sort((a, b) => b.count - a.count);
+                    
+                    return {
+                        total,
+                        noReviewPlan,
+                        inProgress,
+                        mastered,
+                        todayReview, // 这个需要更复杂的逻辑，暂时设为0
+                        overdue, // 这个需要更复杂的逻辑，暂时设为0
+                        categoryDistribution,
+                        averageProgress,
+                        highProgress,
+                        lowProgress,
+                        thisWeekAdded,
+                        thisMonthAdded,
+                        recentActive
+                    };
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

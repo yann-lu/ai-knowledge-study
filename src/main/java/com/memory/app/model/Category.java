@@ -1,5 +1,7 @@
 package com.memory.app.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -9,11 +11,12 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 @Entity
 @Table(name = "category")
-@Data
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 @NoArgsConstructor
 @AllArgsConstructor
 public class Category {
@@ -27,9 +30,11 @@ public class Category {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_id")
+    @JsonIgnore
     private Category parent;
     
     @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL)
+    @JsonIgnore
     private List<Category> children = new ArrayList<>();
     
     @Column(nullable = false)
@@ -45,6 +50,7 @@ public class Category {
     private LocalDateTime updateTime;
     
     @ManyToMany(mappedBy = "categories")
+    @JsonIgnore
     private Set<Knowledge> knowledgeSet = new HashSet<>();
     
     @PrePersist
@@ -87,4 +93,91 @@ public class Category {
         }
         return path.toString();
     }
-} 
+    
+    // Getter and Setter methods
+    public Long getId() {
+        return id;
+    }
+    
+    public void setId(Long id) {
+        this.id = id;
+    }
+    
+    public String getName() {
+        return name;
+    }
+    
+    public void setName(String name) {
+        this.name = name;
+    }
+    
+    public Category getParent() {
+        return parent;
+    }
+    
+    public void setParent(Category parent) {
+        this.parent = parent;
+    }
+    
+    public List<Category> getChildren() {
+        return children;
+    }
+    
+    public void setChildren(List<Category> children) {
+        this.children = children;
+    }
+    
+    public Integer getLevel() {
+        return level;
+    }
+    
+    public void setLevel(Integer level) {
+        this.level = level;
+    }
+    
+    public Integer getSortOrder() {
+        return sortOrder;
+    }
+    
+    public void setSortOrder(Integer sortOrder) {
+        this.sortOrder = sortOrder;
+    }
+    
+    public LocalDateTime getCreateTime() {
+        return createTime;
+    }
+    
+    public void setCreateTime(LocalDateTime createTime) {
+        this.createTime = createTime;
+    }
+    
+    public LocalDateTime getUpdateTime() {
+        return updateTime;
+    }
+    
+    public void setUpdateTime(LocalDateTime updateTime) {
+        this.updateTime = updateTime;
+    }
+    
+    public Set<Knowledge> getKnowledgeSet() {
+        return knowledgeSet;
+    }
+    
+    public void setKnowledgeSet(Set<Knowledge> knowledgeSet) {
+        this.knowledgeSet = knowledgeSet;
+    }
+    
+    // Custom equals and hashCode to avoid circular dependency
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Category category = (Category) o;
+        return Objects.equals(id, category.id);
+    }
+    
+    @Override
+    public int hashCode() {
+        return Objects.hash(id);
+    }
+}

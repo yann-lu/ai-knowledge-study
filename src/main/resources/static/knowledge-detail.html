@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>知识点详情 - 艾宾浩斯记忆助手</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .content-area {
+            line-height: 1.8;
+        }
+        .content-area h1, .content-area h2, .content-area h3 {
+            margin-top: 1.5rem;
+            margin-bottom: 1rem;
+            font-weight: bold;
+        }
+        .content-area h1 { font-size: 1.875rem; }
+        .content-area h2 { font-size: 1.5rem; }
+        .content-area h3 { font-size: 1.25rem; }
+        .content-area p {
+            margin-bottom: 1rem;
+        }
+        .content-area ul, .content-area ol {
+            margin-bottom: 1rem;
+            padding-left: 2rem;
+        }
+        .content-area li {
+            margin-bottom: 0.5rem;
+        }
+        .content-area code {
+            background-color: #f3f4f6;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-family: 'Courier New', monospace;
+        }
+        .content-area pre {
+            background-color: #f3f4f6;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+            margin-bottom: 1rem;
+        }
+        .content-area blockquote {
+            border-left: 4px solid #3b82f6;
+            padding-left: 1rem;
+            margin: 1rem 0;
+            font-style: italic;
+            color: #6b7280;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-purple-400 via-pink-500 to-red-500 min-h-screen">
+    <div id="app">
+        <!-- 导航栏 -->
+        <nav class="bg-white bg-opacity-20 backdrop-blur-lg border-b border-white border-opacity-20">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-center h-16">
+                    <div class="flex space-x-8">
+                        <a href="/knowledge.html" class="flex items-center px-3 py-2 text-white hover:text-yellow-300 transition-colors duration-200">
+                            复习知识库
+                        </a>
+                        <a href="/review.html" class="flex items-center px-3 py-2 text-white hover:text-yellow-300 transition-colors duration-200">
+                            今日复习
+                        </a>
+                        <a href="/category.html" class="flex items-center px-3 py-2 text-white hover:text-yellow-300 transition-colors duration-200">
+                            分类管理
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- 主要内容 -->
+        <div class="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+            <!-- 加载状态 -->
+            <div v-if="loading" class="text-center py-12">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                <p class="mt-2 text-gray-600">加载中...</p>
+            </div>
+
+            <!-- 错误状态 -->
+            <div v-else-if="error" class="text-center py-12">
+                <div class="text-red-500 text-6xl mb-4">⚠️</div>
+                <h3 class="text-lg font-medium text-gray-900 mb-2">加载失败</h3>
+                <p class="text-gray-500 mb-4">{{ error }}</p>
+                <button @click="loadKnowledge" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
+                    重新加载
+                </button>
+            </div>
+
+            <!-- 知识点详情 -->
+            <div v-else-if="knowledge" class="bg-white rounded-lg shadow-lg overflow-hidden">
+                <!-- 头部信息 -->
+                <div class="bg-gradient-to-r from-blue-50 to-purple-50 px-6 py-8 border-b">
+                    <div class="flex justify-between items-start mb-4">
+                        <h1 class="text-3xl font-bold text-gray-900">{{ knowledge.title }}</h1>
+                        <div class="flex space-x-2">
+                            <button @click="editKnowledge" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2">
+                                <span>✏️</span>
+                                <span>编辑</span>
+                            </button>
+                            <button @click="regenerateOutline" :disabled="regeneratingOutline" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 disabled:opacity-50">
+                                <span>📝</span>
+                                <span>{{ regeneratingOutline ? '生成中...' : '重新生成大纲' }}</span>
+                            </button>
+                            <button @click="generateReview" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2">
+                                <span>📚</span>
+                                <span>生成复习</span>
+                            </button>
+                            <button @click="deleteKnowledge" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2">
+                                <span>🗑️</span>
+                                <span>删除</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 分类标签 -->
+                    <div v-if="knowledge.categories && knowledge.categories.length > 0" class="flex flex-wrap gap-2 mb-4">
+                        <span 
+                            v-for="category in knowledge.categories" 
+                            :key="category.id"
+                            class="inline-block bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full"
+                        >
+                            {{ category.name }}
+                        </span>
+                    </div>
+                    
+                    <!-- 元信息 -->
+                    <div class="text-sm text-gray-600">
+                        <span>创建时间: {{ formatDate(knowledge.createdAt) }}</span>
+                        <span v-if="knowledge.updatedAt && knowledge.updatedAt !== knowledge.createdAt" class="ml-4">
+                            更新时间: {{ formatDate(knowledge.updatedAt) }}
+                        </span>
+                    </div>
+                </div>
+                
+                <!-- 大纲 -->
+                <div v-if="knowledge.outline" class="px-6 py-4 bg-yellow-50 border-b">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-2">📋 大纲</h3>
+                    <div class="content-area text-gray-700" v-html="htmlOutline"></div>
+                </div>
+                
+                <!-- 内容 -->
+                <div class="px-6 py-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">📖 内容</h3>
+                    <div class="content-area text-gray-700" v-html="htmlContent"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+        
+        createApp({
+            data() {
+                return {
+                    knowledge: null,
+                    htmlContent: '',
+                    htmlOutline: '',
+                    loading: true,
+                    error: null,
+                    regeneratingOutline: false
+                };
+            },
+            mounted() {
+                this.loadKnowledge();
+            },
+            methods: {
+                async loadKnowledge() {
+                    this.loading = true;
+                    this.error = null;
+                    
+                    try {
+                        // 从URL中获取知识点ID
+                        let knowledgeId = null;
+                        
+                        // 首先尝试从URL参数中获取ID
+                        const urlParams = new URLSearchParams(window.location.search);
+                        knowledgeId = urlParams.get('id');
+                        
+                        // 如果URL参数中没有，则从路径中获取
+                        if (!knowledgeId) {
+                            const pathParts = window.location.pathname.split('/');
+                            knowledgeId = pathParts[pathParts.length - 1];
+                        }
+                        
+                        // 如果还是没有，尝试从referrer中获取
+                        if (!knowledgeId || isNaN(knowledgeId)) {
+                            const referrer = document.referrer;
+                            if (referrer) {
+                                const referrerParts = referrer.split('/');
+                                const possibleId = referrerParts[referrerParts.length - 1];
+                                if (possibleId && !isNaN(possibleId)) {
+                                    knowledgeId = possibleId;
+                                }
+                            }
+                        }
+                        
+                        if (!knowledgeId || isNaN(knowledgeId)) {
+                            throw new Error('无效的知识点ID');
+                        }
+                        
+                        const response = await fetch(`/api/knowledge/${knowledgeId}`);
+                        
+                        if (!response.ok) {
+                            if (response.status === 404) {
+                                throw new Error('知识点不存在');
+                            }
+                            throw new Error('加载知识点失败');
+                        }
+                        
+                        const data = await response.json();
+                        this.knowledge = data.knowledge;
+                        this.htmlContent = data.htmlContent || '';
+                        this.htmlOutline = data.htmlOutline || '';
+                    } catch (error) {
+                        console.error('加载知识点失败:', error);
+                        this.error = error.message;
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                editKnowledge() {
+                    // 跳转到编辑页面（可以在knowledge.html中实现编辑功能）
+                    window.location.href = `/knowledge.html?edit=${this.knowledge.id}`;
+                },
+                async generateReview() {
+                    try {
+                        const response = await fetch(`/api/reviews/knowledge/${this.knowledge.id}/generate`, {
+                            method: 'POST'
+                        });
+                        
+                        if (response.ok) {
+                            alert('复习计划生成成功！');
+                        } else {
+                            const error = await response.text();
+                            alert('生成复习计划失败：' + error);
+                        }
+                    } catch (error) {
+                        console.error('生成复习计划失败:', error);
+                        alert('生成复习计划失败：' + error.message);
+                    }
+                },
+                async regenerateOutline() {
+                    if (!this.knowledge || !this.knowledge.id) {
+                        alert('无效的知识点');
+                        return;
+                    }
+                    
+                    this.regeneratingOutline = true;
+                    
+                    try {
+                        const response = await fetch(`/api/knowledge/${this.knowledge.id}/regenerate-outline`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                        
+                        if (response.ok) {
+                            const result = await response.json();
+                            this.knowledge.outline = result.outline;
+                            this.htmlOutline = result.htmlOutline || '';
+                            alert('大纲重新生成成功！');
+                        } else {
+                            const error = await response.text();
+                            alert('重新生成大纲失败：' + error);
+                        }
+                    } catch (error) {
+                        console.error('重新生成大纲失败:', error);
+                        alert('重新生成大纲失败：' + error.message);
+                    } finally {
+                        this.regeneratingOutline = false;
+                    }
+                },
+                formatDate(dateString) {
+                    if (!dateString) return '';
+                    const date = new Date(dateString);
+                    return date.toLocaleString('zh-CN');
+                },
+                async deleteKnowledge() {
+                    if (!this.knowledge || !this.knowledge.id) {
+                        alert('无效的知识点');
+                        return;
+                    }
+                    
+                    if (!confirm(`确定要删除知识点"${this.knowledge.title}"吗？\n\n删除后将同时删除相关的复习计划数据，此操作不可恢复！`)) {
+                        return;
+                    }
+                    
+                    try {
+                        const response = await fetch(`/api/knowledge/${this.knowledge.id}`, {
+                            method: 'DELETE'
+                        });
+                        
+                        if (response.ok) {
+                            alert('知识点删除成功！');
+                            // 删除成功后跳转回知识库列表页面
+                            window.location.href = '/knowledge.html';
+                        } else {
+                            const error = await response.text();
+                            alert('删除失败：' + error);
+                        }
+                    } catch (error) {
+                        console.error('删除知识点失败:', error);
+                        alert('删除失败：' + error.message);
+                    }
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
