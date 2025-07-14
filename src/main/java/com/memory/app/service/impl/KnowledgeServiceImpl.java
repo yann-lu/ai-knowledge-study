@@ -19,6 +19,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -398,5 +400,150 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         // 预加载分类信息以避免N+1查询
         page.getContent().forEach(knowledge -> knowledge.getCategories().size());
         return page;
+    }
+    
+    @Override
+    public Map<String, Object> getKnowledgeStatistics(String keyword, Long categoryId) {
+        Map<String, Object> statistics = new HashMap<>();
+        
+        try {
+            // 获取符合条件的知识点列表
+            List<Knowledge> knowledgeList;
+            if (categoryId != null) {
+                if (keyword != null && !keyword.trim().isEmpty()) {
+                    knowledgeList = searchByCategoryAndKeyword(categoryId, keyword);
+                } else {
+                    knowledgeList = findByCategory(categoryId);
+                }
+            } else {
+                if (keyword != null && !keyword.trim().isEmpty()) {
+                    knowledgeList = searchByKeyword(keyword);
+                } else {
+                    knowledgeList = findAll();
+                }
+            }
+            
+            // 基础统计
+            int total = knowledgeList.size();
+            statistics.put("total", total);
+            
+            // 复习状态统计
+            int noReviewPlan = 0;
+            int inProgress = 0;
+            int mastered = 0;
+            int todayReview = 0;
+            int overdue = 0;
+            
+            // 分类分布统计
+            Map<String, Integer> categoryDistributionMap = new HashMap<>();
+            
+            // 进度统计
+            List<Integer> progressList = new ArrayList<>();
+            
+            // 时间统计
+            LocalDate today = LocalDate.now();
+            LocalDate oneWeekAgo = today.minusDays(7);
+            LocalDate oneMonthAgo = today.minusDays(30);
+            int thisWeekAdded = 0;
+            int thisMonthAdded = 0;
+            int recentActive = 0;
+            
+            for (Knowledge knowledge : knowledgeList) {
+                // 复习状态统计
+                Map<String, Object> reviewStatus = getReviewStatus(knowledge.getId());
+                boolean hasReviewPlan = (Boolean) reviewStatus.get("hasReviewPlan");
+                
+                if (!hasReviewPlan) {
+                    noReviewPlan++;
+                } else {
+                    String status = (String) reviewStatus.get("reviewStatus");
+                    if ("已掌握".equals(status)) {
+                        mastered++;
+                    } else {
+                        inProgress++;
+                    }
+                    
+                    // 计算进度
+                    int completedCount = ((Number) reviewStatus.get("completedCount")).intValue();
+                    int totalCount = ((Number) reviewStatus.get("totalCount")).intValue();
+                    int progress = totalCount > 0 ? (completedCount * 100 / totalCount) : 0;
+                    progressList.add(progress);
+                }
+                
+                // 分类分布统计
+                if (knowledge.getCategories() != null && !knowledge.getCategories().isEmpty()) {
+                    for (Category category : knowledge.getCategories()) {
+                        String categoryName = category.getName();
+                        categoryDistributionMap.put(categoryName, 
+                            categoryDistributionMap.getOrDefault(categoryName, 0) + 1);
+                    }
+                } else {
+                    categoryDistributionMap.put("未分类", 
+                        categoryDistributionMap.getOrDefault("未分类", 0) + 1);
+                }
+                
+                // 时间统计
+                if (knowledge.getCreateTime() != null) {
+                    LocalDate createDate = knowledge.getCreateTime().toLocalDate();
+                    if (createDate.isAfter(oneWeekAgo) || createDate.isEqual(oneWeekAgo)) {
+                        thisWeekAdded++;
+                        recentActive++;
+                    }
+                    if (createDate.isAfter(oneMonthAgo) || createDate.isEqual(oneMonthAgo)) {
+                        thisMonthAdded++;
+                    }
+                }
+            }
+            
+            // 设置复习状态统计
+            statistics.put("noReviewPlan", noReviewPlan);
+            statistics.put("inProgress", inProgress);
+            statistics.put("mastered", mastered);
+            statistics.put("todayReview", todayReview); // 暂时设为0，需要更复杂的逻辑
+            statistics.put("overdue", overdue); // 暂时设为0，需要更复杂的逻辑
+            
+            // 设置分类分布
+            List<Map<String, Object>> categoryDistribution = new ArrayList<>();
+            for (Map.Entry<String, Integer> entry : categoryDistributionMap.entrySet()) {
+                Map<String, Object> categoryInfo = new HashMap<>();
+                categoryInfo.put("categoryName", entry.getKey());
+                categoryInfo.put("count", entry.getValue());
+                categoryDistribution.add(categoryInfo);
+            }
+            statistics.put("categoryDistribution", categoryDistribution);
+            
+            // 设置进度统计
+            int averageProgress = progressList.isEmpty() ? 0 : 
+                (int) progressList.stream().mapToInt(Integer::intValue).average().orElse(0);
+            int highProgress = (int) progressList.stream().filter(p -> p > 80).count();
+            int lowProgress = (int) progressList.stream().filter(p -> p < 50).count();
+            
+            statistics.put("averageProgress", averageProgress);
+            statistics.put("highProgress", highProgress);
+            statistics.put("lowProgress", lowProgress);
+            
+            // 设置时间统计
+            statistics.put("thisWeekAdded", thisWeekAdded);
+            statistics.put("thisMonthAdded", thisMonthAdded);
+            statistics.put("recentActive", recentActive);
+            
+        } catch (Exception e) {
+            // 如果出现异常，返回默认统计数据
+            statistics.put("total", 0);
+            statistics.put("noReviewPlan", 0);
+            statistics.put("inProgress", 0);
+            statistics.put("mastered", 0);
+            statistics.put("todayReview", 0);
+            statistics.put("overdue", 0);
+            statistics.put("categoryDistribution", new ArrayList<>());
+            statistics.put("averageProgress", 0);
+            statistics.put("highProgress", 0);
+            statistics.put("lowProgress", 0);
+            statistics.put("thisWeekAdded", 0);
+            statistics.put("thisMonthAdded", 0);
+            statistics.put("recentActive", 0);
+        }
+        
+        return statistics;
     }
 }

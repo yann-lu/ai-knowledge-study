@@ -323,4 +323,26 @@ public class ApiKnowledgeController {
                     .body(Map.of("error", "分页查询知识点失败: " + e.getMessage()));
         }
     }
+    
+    @GetMapping("/statistics")
+    public ResponseEntity<?> getKnowledgeStatistics(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10000") int size,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long categoryId) {
+        try {
+            logger.info("Received statistics request - page: {}, size: {}, keyword: {}, categoryId: {}", 
+                       page, size, keyword, categoryId);
+            
+            // 获取知识点统计数据
+            Map<String, Object> statistics = knowledgeService.getKnowledgeStatistics(keyword, categoryId);
+            
+            logger.info("Returning knowledge statistics");
+            return ResponseEntity.ok(statistics);
+        } catch (Exception e) {
+            logger.error("获取知识点统计失败: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "获取知识点统计失败: " + e.getMessage()));
+        }
+    }
 }

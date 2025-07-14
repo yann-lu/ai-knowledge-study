@@ -6,6 +6,10 @@
     <title>知识库 - 艾宾浩斯记忆助手</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Markdown编辑器相关依赖 -->
+    <script src="/js/marked.min.js"></script>
+    <script src="/js/highlight.min.js"></script>
+    <link rel="stylesheet" href="/css/highlight-github.min.css">
     <style>
         .tree-select {
             position: relative;
@@ -63,6 +67,165 @@
         .knowledge-card:hover {
             transform: translateY(-2px);
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Markdown编辑器样式 */
+        .markdown-editor {
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            overflow: hidden;
+        }
+        
+        .markdown-editor-header {
+            background: #f9fafb;
+            border-bottom: 1px solid #e5e7eb;
+            padding: 0.5rem 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .markdown-editor-tabs {
+            display: flex;
+            gap: 1rem;
+        }
+        
+        .markdown-editor-tab {
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+        
+        .markdown-editor-tab.active {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        .markdown-editor-tab:not(.active) {
+            color: #6b7280;
+        }
+        
+        .markdown-editor-tab:not(.active):hover {
+            background: #e5e7eb;
+        }
+        
+        .markdown-editor-content {
+            display: flex;
+            height: 400px;
+        }
+        
+        .markdown-editor-input {
+            flex: 1;
+            border: none;
+            outline: none;
+            padding: 1rem;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.875rem;
+            line-height: 1.5;
+            resize: none;
+        }
+        
+        .markdown-editor-preview {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            background: #fafafa;
+            border-left: 1px solid #e5e7eb;
+        }
+        
+        .markdown-editor-preview h1,
+        .markdown-editor-preview h2,
+        .markdown-editor-preview h3,
+        .markdown-editor-preview h4,
+        .markdown-editor-preview h5,
+        .markdown-editor-preview h6 {
+            margin-top: 1.5rem;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+        
+        .markdown-editor-preview h1 { font-size: 1.875rem; }
+        .markdown-editor-preview h2 { font-size: 1.5rem; }
+        .markdown-editor-preview h3 { font-size: 1.25rem; }
+        .markdown-editor-preview h4 { font-size: 1.125rem; }
+        
+        .markdown-editor-preview p {
+            margin-bottom: 1rem;
+            line-height: 1.6;
+        }
+        
+        .markdown-editor-preview ul,
+        .markdown-editor-preview ol {
+            margin-bottom: 1rem;
+            padding-left: 1.5rem;
+        }
+        
+        .markdown-editor-preview li {
+            margin-bottom: 0.25rem;
+        }
+        
+        .markdown-editor-preview code {
+            background: #f1f5f9;
+            padding: 0.125rem 0.25rem;
+            border-radius: 0.25rem;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.875rem;
+        }
+        
+        .markdown-editor-preview pre {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.375rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            overflow-x: auto;
+        }
+        
+        .markdown-editor-preview pre code {
+            background: none;
+            padding: 0;
+        }
+        
+        .markdown-editor-preview blockquote {
+            border-left: 4px solid #e2e8f0;
+            padding-left: 1rem;
+            margin: 1rem 0;
+            color: #64748b;
+            font-style: italic;
+        }
+        
+        .markdown-editor-preview table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1rem;
+        }
+        
+        .markdown-editor-preview th,
+        .markdown-editor-preview td {
+            border: 1px solid #e2e8f0;
+            padding: 0.5rem;
+            text-align: left;
+        }
+        
+        .markdown-editor-preview th {
+            background: #f8fafc;
+            font-weight: 600;
+        }
+        
+        .markdown-editor-fullscreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 9999;
+            background: white;
+        }
+        
+        .markdown-editor-fullscreen .markdown-editor-content {
+            height: calc(100vh - 60px);
         }
     </style>
 </head>
@@ -477,9 +640,9 @@
                             @click="changePage(page)"
                             :class="{
                                 'bg-blue-500 text-white border-blue-500': page === currentPage,
-                                'text-gray-500 bg-white border-gray-300 hover:bg-gray-50': page !== currentPage
-                            }"
-                            class="px-3 py-2 text-sm font-medium border rounded-md transition-colors"
+                                 'text-gray-500 bg-white border-gray-300 hover:bg-gray-50': page !== currentPage
+                             }"
+                             class="px-3 py-2 text-sm font-medium border rounded-md transition-colors"
                         >
                             {{ page }}
                         </button>
@@ -539,13 +702,60 @@
                     <!-- 内容 -->
                     <div class="mb-4">
                         <label class="block text-sm font-medium text-gray-700 mb-2">内容 *</label>
-                        <textarea 
-                            v-model="knowledgeForm.content"
-                            required
-                            rows="15"
-                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y min-h-[300px]"
-                            placeholder="请输入知识点内容（支持Markdown格式）"
-                        ></textarea>
+                        <div class="markdown-editor" :class="{ 'markdown-editor-fullscreen': isFullscreen }">
+                            <div class="markdown-editor-header">
+                                <div class="markdown-editor-tabs">
+                                    <div 
+                                        class="markdown-editor-tab" 
+                                        :class="{ active: editorMode === 'edit' }"
+                                        @click="editorMode = 'edit'"
+                                    >
+                                        📝 编辑
+                                    </div>
+                                    <div 
+                                        class="markdown-editor-tab" 
+                                        :class="{ active: editorMode === 'preview' }"
+                                        @click="editorMode = 'preview'"
+                                    >
+                                        👁️ 预览
+                                    </div>
+                                    <div 
+                                        class="markdown-editor-tab" 
+                                        :class="{ active: editorMode === 'split' }"
+                                        @click="editorMode = 'split'"
+                                    >
+                                        📱 分屏
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <button 
+                                        type="button"
+                                        @click="toggleFullscreen"
+                                        class="text-gray-500 hover:text-gray-700 p-1 rounded"
+                                        :title="isFullscreen ? '退出全屏' : '全屏编辑'"
+                                    >
+                                        {{ isFullscreen ? '🗗' : '🗖' }}
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="markdown-editor-content">
+                                <textarea 
+                                    v-if="editorMode === 'edit' || editorMode === 'split'"
+                                    v-model="knowledgeForm.content"
+                                    required
+                                    class="markdown-editor-input"
+                                    :class="{ 'w-full': editorMode === 'edit' }"
+                                    placeholder="请输入知识点内容（支持Markdown格式）\n\n示例：\n# 标题\n## 二级标题\n\n**粗体文本**\n*斜体文本*\n\n- 列表项1\n- 列表项2\n\n```javascript\nconst code = 'example';\n```\n\n> 引用文本"
+                                    @input="updatePreview"
+                                ></textarea>
+                                <div 
+                                    v-if="editorMode === 'preview' || editorMode === 'split'"
+                                    class="markdown-editor-preview"
+                                    :class="{ 'w-full': editorMode === 'preview' }"
+                                    v-html="markdownPreview"
+                                ></div>
+                            </div>
+                        </div>
                     </div>
                     
                     <!-- 分类选择 -->
@@ -700,6 +910,10 @@
                     showModalCategoryDropdown: false,
                     modalCategorySearchText: '',
                     isEditMode: false,
+                    // Markdown编辑器相关
+                    editorMode: 'split', // 'edit', 'preview', 'split'
+                    isFullscreen: false,
+                    markdownPreview: '',
                     // 分页相关数据
                     currentPage: 1,
                     pageSize: 12,
@@ -885,8 +1099,7 @@
                         this.showModalCategoryDropdown = false;
                     }
                 },
-                closeAddModal() {
-                    this.showAddModal = false;
+                resetForm() {
                     this.showModalCategoryDropdown = false;
                     this.knowledgeForm = {
                         id: null,
@@ -895,6 +1108,8 @@
                         categoryIds: []
                     };
                     this.modalCategorySearchText = '';
+                    this.markdownPreview = '';
+                    this.editorMode = 'split';
                     if (this.isEditMode) {
                         // 如果是编辑模式，关闭时清除URL参数并重置编辑模式
                         window.history.replaceState({}, '', '/knowledge.html');
@@ -959,6 +1174,8 @@
                                 content: knowledge.content,
                                 categoryIds: knowledge.categories ? knowledge.categories.map(c => c.id) : []
                             };
+                            // 更新Markdown预览
+                            this.updatePreview();
                         } else {
                             alert('加载知识点失败');
                             window.location.href = '/knowledge.html';
@@ -1396,6 +1613,67 @@
                         thisMonthAdded,
                         recentActive
                     };
+                },
+                
+                // Markdown编辑器相关方法
+                updatePreview() {
+                    if (this.knowledgeForm.content) {
+                        try {
+                            // 配置marked选项
+                            marked.setOptions({
+                                highlight: function(code, lang) {
+                                    if (lang && hljs.getLanguage(lang)) {
+                                        try {
+                                            return hljs.highlight(code, { language: lang }).value;
+                                        } catch (err) {}
+                                    }
+                                    return hljs.highlightAuto(code).value;
+                                },
+                                breaks: true,
+                                gfm: true
+                            });
+                            
+                            this.markdownPreview = marked.parse(this.knowledgeForm.content);
+                        } catch (error) {
+                            console.error('Markdown解析错误:', error);
+                            this.markdownPreview = '<p class="text-red-500">Markdown解析错误</p>';
+                        }
+                    } else {
+                        this.markdownPreview = '<p class="text-gray-400">在左侧输入Markdown内容，这里将显示预览效果</p>';
+                    }
+                },
+                
+                toggleFullscreen() {
+                    this.isFullscreen = !this.isFullscreen;
+                    if (this.isFullscreen) {
+                        document.body.style.overflow = 'hidden';
+                    } else {
+                        document.body.style.overflow = '';
+                    }
+                },
+                
+                // 关闭模态框时退出全屏
+                closeAddModal() {
+                    this.showAddModal = false;
+                    this.isFullscreen = false;
+                    document.body.style.overflow = '';
+                    this.resetForm();
+                }
+            },
+            mounted() {
+                this.loadCategories();
+                this.loadKnowledge(1);
+                this.loadStatistics();
+                this.checkEditMode();
+                // 初始化Markdown预览
+                this.updatePreview();
+            },
+            watch: {
+                'knowledgeForm.content': {
+                    handler: function(newVal, oldVal) {
+                        this.updatePreview();
+                    },
+                    immediate: true
                 }
             }
         }).mount('#app');

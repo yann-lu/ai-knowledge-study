@@ -70,10 +70,10 @@ public class ApiCategoryController {
             category.setSortOrder(categoryDTO.getSortOrder() != null ? categoryDTO.getSortOrder() : 0);
             
             if (categoryDTO.getParentId() != null) {
-                categoryService.findById(categoryDTO.getParentId()).ifPresent(parent -> {
-                    category.setParent(parent);
-                    category.setLevel(parent.getLevel() + 1);
-                });
+                Category parent = categoryService.findById(categoryDTO.getParentId())
+                        .orElseThrow(() -> new IllegalArgumentException("父分类不存在: " + categoryDTO.getParentId()));
+                category.setParent(parent);
+                category.setLevel(parent.getLevel() + 1);
             } else {
                 category.setParent(null);
                 category.setLevel(1);
@@ -99,10 +99,10 @@ public class ApiCategoryController {
                         category.setSortOrder(categoryDTO.getSortOrder() != null ? categoryDTO.getSortOrder() : 0);
                         
                         if (categoryDTO.getParentId() != null) {
-                            categoryService.findById(categoryDTO.getParentId()).ifPresent(parent -> {
-                                category.setParent(parent);
-                                category.setLevel(parent.getLevel() + 1);
-                            });
+                            Category parent = categoryService.findById(categoryDTO.getParentId())
+                                    .orElseThrow(() -> new IllegalArgumentException("父分类不存在: " + categoryDTO.getParentId()));
+                            category.setParent(parent);
+                            category.setLevel(parent.getLevel() + 1);
                         } else {
                             category.setParent(null);
                             category.setLevel(1);

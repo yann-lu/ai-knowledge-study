@@ -66,4 +66,7 @@ public interface KnowledgeService {
     
     // 分页搜索知识点
     Page<Knowledge> searchWithPagination(String keyword, Long categoryId, Set<Long> categoryIds, Pageable pageable);
+    
+    // 获取知识点统计数据
+    Map<String, Object> getKnowledgeStatistics(String keyword, Long categoryId);
 }

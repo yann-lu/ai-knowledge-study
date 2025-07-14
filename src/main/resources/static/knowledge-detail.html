@@ -53,26 +53,10 @@
 <body class="bg-gradient-to-br from-purple-400 via-pink-500 to-red-500 min-h-screen">
     <div id="app">
         <!-- 导航栏 -->
-        <nav class="bg-white bg-opacity-20 backdrop-blur-lg border-b border-white border-opacity-20">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-center h-16">
-                    <div class="flex space-x-8">
-                        <a href="/knowledge.html" class="flex items-center px-3 py-2 text-white hover:text-yellow-300 transition-colors duration-200">
-                            复习知识库
-                        </a>
-                        <a href="/review.html" class="flex items-center px-3 py-2 text-white hover:text-yellow-300 transition-colors duration-200">
-                            今日复习
-                        </a>
-                        <a href="/category.html" class="flex items-center px-3 py-2 text-white hover:text-yellow-300 transition-colors duration-200">
-                            分类管理
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </nav>
+        <div id="navbar"></div>
 
         <!-- 主要内容 -->
-        <div class="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-none mx-auto py-8 px-4 sm:px-6 lg:px-8" style="max-width: 90%;">
             <!-- 加载状态 -->
             <div v-if="loading" class="text-center py-12">
                 <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
@@ -164,10 +148,31 @@
                     regeneratingOutline: false
                 };
             },
-            mounted() {
+            async mounted() {
+                // 加载公共导航栏
+                await this.loadNavbar();
                 this.loadKnowledge();
             },
             methods: {
+                async loadNavbar() {
+                    try {
+                        const response = await fetch('/components/navbar.html');
+                        const navbarHtml = await response.text();
+                        document.getElementById('navbar').innerHTML = navbarHtml;
+                        
+                        // 创建导航栏Vue实例
+                        const navbarApp = createApp({
+                            data() {
+                                return {
+                                    currentPage: 'knowledge-detail'
+                                };
+                            }
+                        });
+                        navbarApp.mount('#navbar nav');
+                    } catch (error) {
+                        console.error('加载导航栏失败:', error);
+                    }
+                },
                 async loadKnowledge() {
                     this.loading = true;
                     this.error = null;
