@@ -6,6 +6,9 @@
     <title>知识点详情 - 艾宾浩斯记忆助手</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 代码高亮相关依赖 -->
+    <script src="/js/highlight.min.js"></script>
+    <link rel="stylesheet" href="/css/highlight-github.min.css">
     <style>
         .content-area {
             line-height: 1.8;
@@ -28,25 +31,84 @@
         .content-area li {
             margin-bottom: 0.5rem;
         }
-        .content-area code {
-            background-color: #f3f4f6;
-            padding: 0.25rem 0.5rem;
+        
+        /* 内联代码样式 */
+        .content-area code:not(pre code) {
+            background-color: #f1f5f9;
+            color: #e11d48;
+            padding: 0.125rem 0.375rem;
             border-radius: 0.25rem;
-            font-family: 'Courier New', monospace;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+            font-size: 0.875em;
+            font-weight: 500;
         }
+        
+        /* 代码块容器样式 */
         .content-area pre {
-            background-color: #f3f4f6;
-            padding: 1rem;
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
             border-radius: 0.5rem;
+            padding: 1rem;
+            margin: 1rem 0;
             overflow-x: auto;
-            margin-bottom: 1rem;
+            position: relative;
+            line-height: 1.5;
         }
+        
+        /* 代码块内的代码样式 */
+        .content-area pre code {
+            background: none !important;
+            color: inherit;
+            padding: 0;
+            border-radius: 0;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+            font-size: 0.875rem;
+            line-height: 1.5;
+            white-space: pre;
+            word-wrap: normal;
+            display: block;
+        }
+        
+        /* 代码块语言标签 */
+        .content-area pre[class*="language-"]::before {
+            content: attr(data-language);
+            position: absolute;
+            top: 0.5rem;
+            right: 0.75rem;
+            font-size: 0.75rem;
+            color: #64748b;
+            background: #e2e8f0;
+            padding: 0.125rem 0.5rem;
+            border-radius: 0.25rem;
+            text-transform: uppercase;
+            font-weight: 500;
+        }
+        
         .content-area blockquote {
             border-left: 4px solid #3b82f6;
             padding-left: 1rem;
             margin: 1rem 0;
             font-style: italic;
             color: #6b7280;
+        }
+        
+        /* 表格样式 */
+        .content-area table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+        
+        .content-area th,
+        .content-area td {
+            border: 1px solid #e2e8f0;
+            padding: 0.5rem;
+            text-align: left;
+        }
+        
+        .content-area th {
+            background: #f8fafc;
+            font-weight: 600;
         }
     </style>
 </head>
@@ -92,6 +154,10 @@
                                 <span>📚</span>
                                 <span>生成复习</span>
                             </button>
+                            <button @click="openAiChat" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2">
+                                <span>🤖</span>
+                                <span>AI对话</span>
+                            </button>
                             <button @click="deleteKnowledge" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2">
                                 <span>🗑️</span>
                                 <span>删除</span>
@@ -132,6 +198,88 @@
                 </div>
             </div>
         </div>
+        
+        <!-- AI对话框模态窗口 -->
+        <div v-if="showAiChat" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click="closeAiChat">
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-4xl h-5/6 flex flex-col" @click.stop>
+                <!-- 对话框头部 -->
+                <div class="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-6 py-4 rounded-t-lg flex justify-between items-center">
+                    <h3 class="text-lg font-semibold flex items-center space-x-2">
+                        <span>🤖</span>
+                        <span>AI助手 - {{ knowledge.title }}</span>
+                    </h3>
+                    <button @click="closeAiChat" class="text-white hover:text-gray-200 text-2xl">&times;</button>
+                </div>
+                
+                <!-- 对话内容区域 -->
+                <div class="flex-1 flex flex-col overflow-hidden">
+                    <!-- 消息列表 -->
+                    <div class="flex-1 overflow-y-auto p-4 space-y-4" ref="chatMessages">
+                        <div v-for="(message, index) in chatMessages" :key="index" class="flex" :class="message.role === 'user' ? 'justify-end' : 'justify-start'">
+                             <div class="max-w-3xl px-4 py-2 rounded-lg" :class="message.role === 'user' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-800'">
+                                <div class="text-sm font-medium mb-1" :class="message.role === 'user' ? 'text-blue-100' : 'text-gray-600'">
+                                    {{ message.role === 'user' ? '我' : 'AI助手' }}
+                                </div>
+                                <div class="whitespace-pre-wrap" v-html="formatMessage(message.content)"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- AI思考中状态 -->
+                        <div v-if="aiThinking" class="flex justify-start">
+                            <div class="bg-gray-100 text-gray-800 px-4 py-2 rounded-lg max-w-3xl">
+                                <div class="text-sm font-medium text-gray-600 mb-1">AI助手</div>
+                                <div class="flex items-center space-x-2">
+                                    <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-500"></div>
+                                    <span>正在思考中...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 快捷操作按钮 -->
+                    <div class="px-4 py-2 border-t bg-gray-50">
+                        <div class="flex flex-wrap gap-2">
+                            <button @click="sendQuickMessage('请帮我总结一下这个知识点的核心内容')" class="bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1 rounded-full text-sm">
+                                📝 总结核心内容
+                            </button>
+                            <button @click="sendQuickMessage('请基于这个知识点生成5道面试题来测试我')" class="bg-green-100 hover:bg-green-200 text-green-800 px-3 py-1 rounded-full text-sm">
+                                ❓ 生成面试题
+                            </button>
+                            <button @click="sendQuickMessage('请帮我制定这个知识点的学习计划')" class="bg-yellow-100 hover:bg-yellow-200 text-yellow-800 px-3 py-1 rounded-full text-sm">
+                                📅 制定学习计划
+                            </button>
+                            <button @click="sendQuickMessage('请解释一下这个知识点中的难点和重点')" class="bg-purple-100 hover:bg-purple-200 text-purple-800 px-3 py-1 rounded-full text-sm">
+                                💡 解释难点重点
+                            </button>
+                            <button @click="sendQuickMessage('请给出一些相关的实践练习建议')" class="bg-orange-100 hover:bg-orange-200 text-orange-800 px-3 py-1 rounded-full text-sm">
+                                🏃 实践练习
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 输入区域 -->
+                    <div class="p-4 border-t">
+                        <div class="flex space-x-2">
+                            <textarea 
+                                v-model="currentMessage" 
+                                @keydown.enter.prevent="sendMessage"
+                                placeholder="输入您的问题或要求..."
+                                class="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                                rows="2"
+                            ></textarea>
+                            <button 
+                                @click="sendMessage" 
+                                :disabled="!currentMessage.trim() || aiThinking"
+                                class="bg-purple-500 hover:bg-purple-600 disabled:bg-gray-300 text-white px-4 py-2 rounded-lg flex items-center space-x-1"
+                            >
+                                <span>发送</span>
+                                <span>📤</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -145,7 +293,12 @@
                     htmlOutline: '',
                     loading: true,
                     error: null,
-                    regeneratingOutline: false
+                    regeneratingOutline: false,
+                    // AI对话相关数据
+                    showAiChat: false,
+                    chatMessages: [],
+                    currentMessage: '',
+                    aiThinking: false
                 };
             },
             async mounted() {
@@ -220,6 +373,11 @@
                         this.knowledge = data.knowledge;
                         this.htmlContent = data.htmlContent || '';
                         this.htmlOutline = data.htmlOutline || '';
+                        
+                        // 等待DOM更新后初始化代码高亮
+                        this.$nextTick(() => {
+                            this.initializeCodeHighlight();
+                        });
                     } catch (error) {
                         console.error('加载知识点失败:', error);
                         this.error = error.message;
@@ -311,6 +469,142 @@
                     } catch (error) {
                         console.error('删除知识点失败:', error);
                         alert('删除失败：' + error.message);
+                    }
+                },
+                
+                // 初始化代码高亮
+                initializeCodeHighlight() {
+                    if (typeof hljs !== 'undefined') {
+                        // 高亮所有代码块
+                        document.querySelectorAll('.content-area pre code').forEach((block) => {
+                            hljs.highlightElement(block);
+                        });
+                        
+                        // 为代码块添加语言标签
+                        document.querySelectorAll('.content-area pre[class*="language-"]').forEach((pre) => {
+                            const className = pre.className;
+                            const match = className.match(/language-(\w+)/);
+                            if (match) {
+                                const language = match[1];
+                                pre.setAttribute('data-language', language);
+                            }
+                        });
+                    }
+                },
+                
+                // AI对话相关方法
+                openAiChat() {
+                    this.showAiChat = true;
+                    // 如果是第一次打开，发送知识点内容给AI
+                    if (this.chatMessages.length === 0) {
+                        this.initializeAiChat();
+                    }
+                    // 滚动到底部
+                    this.$nextTick(() => {
+                        this.scrollToBottom();
+                    });
+                },
+                
+                closeAiChat() {
+                    this.showAiChat = false;
+                },
+                
+                initializeAiChat() {
+                    const welcomeMessage = {
+                        role: 'assistant',
+                        content: `你好！我是AI助手，我已经了解了您正在学习的知识点："${this.knowledge.title}"。\n\n我可以帮助您：\n• 总结核心内容\n• 生成面试题进行测试\n• 制定学习计划\n• 解释难点重点\n• 提供实践练习建议\n\n请告诉我您需要什么帮助！`
+                    };
+                    this.chatMessages.push(welcomeMessage);
+                },
+                
+                async sendMessage() {
+                    if (!this.currentMessage.trim() || this.aiThinking) {
+                        return;
+                    }
+                    
+                    // 添加用户消息
+                    const userMessage = {
+                        role: 'user',
+                        content: this.currentMessage.trim()
+                    };
+                    this.chatMessages.push(userMessage);
+                    
+                    const messageToSend = this.currentMessage.trim();
+                    this.currentMessage = '';
+                    this.aiThinking = true;
+                    
+                    // 滚动到底部
+                    this.$nextTick(() => {
+                        this.scrollToBottom();
+                    });
+                    
+                    try {
+                        // 构建发送给AI的完整上下文
+                        const knowledgeContext = `知识点标题：${this.knowledge.title}\n\n`;
+                        const outlineContext = this.knowledge.outline ? `大纲：\n${this.knowledge.outline}\n\n` : '';
+                        const contentContext = this.knowledge.content ? `内容：\n${this.knowledge.content}\n\n` : '';
+                        const fullContext = knowledgeContext + outlineContext + contentContext;
+                        
+                        // 发送请求到后端AI接口
+                        const response = await fetch('/api/ai/chat', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                message: messageToSend,
+                                context: fullContext,
+                                knowledgeId: this.knowledge.id
+                            })
+                        });
+                        
+                        if (response.ok) {
+                            const result = await response.json();
+                            const aiMessage = {
+                                role: 'assistant',
+                                content: result.response || '抱歉，我暂时无法回答您的问题。'
+                            };
+                            this.chatMessages.push(aiMessage);
+                        } else {
+                            const aiMessage = {
+                                role: 'assistant',
+                                content: '抱歉，AI服务暂时不可用，请稍后再试。'
+                            };
+                            this.chatMessages.push(aiMessage);
+                        }
+                    } catch (error) {
+                        console.error('AI对话失败:', error);
+                        const aiMessage = {
+                            role: 'assistant',
+                            content: '抱歉，发生了网络错误，请检查网络连接后重试。'
+                        };
+                        this.chatMessages.push(aiMessage);
+                    } finally {
+                        this.aiThinking = false;
+                        // 滚动到底部
+                        this.$nextTick(() => {
+                            this.scrollToBottom();
+                        });
+                    }
+                },
+                
+                sendQuickMessage(message) {
+                    this.currentMessage = message;
+                    this.sendMessage();
+                },
+                
+                formatMessage(content) {
+                    // 简单的Markdown格式化
+                    return content
+                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                        .replace(/`(.*?)`/g, '<code class="bg-gray-200 px-1 rounded">$1</code>')
+                        .replace(/\n/g, '<br>');
+                },
+                
+                scrollToBottom() {
+                    if (this.$refs.chatMessages) {
+                        this.$refs.chatMessages.scrollTop = this.$refs.chatMessages.scrollHeight;
                     }
                 }
             }

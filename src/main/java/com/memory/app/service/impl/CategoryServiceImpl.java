@@ -100,8 +100,11 @@ public class CategoryServiceImpl implements CategoryService {
             Map<String, Object> node = new HashMap<>();
             node.put("id", category.getId());
             node.put("name", category.getName());
+            node.put("parentId", category.getParentId());
             node.put("level", category.getLevel());
             node.put("sortOrder", category.getSortOrder());
+            node.put("createTime", category.getCreateTime());
+            node.put("updateTime", category.getUpdateTime());
             
             // 获取知识点统计信息
             Optional<Category> categoryEntity = categoryRepository.findById(category.getId());

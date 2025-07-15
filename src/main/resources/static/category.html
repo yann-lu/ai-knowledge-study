@@ -292,7 +292,7 @@
                     this.categoryForm = {
                         id: category.id,
                         name: category.name,
-                        parentId: category.parent ? category.parent.id : '',
+                        parentId: category.parentId || '',
                         sortOrder: category.sortOrder || 0
                     };
                     this.showEditModal = true;
@@ -338,7 +338,7 @@
                         };
                         
                         if (this.categoryForm.parentId) {
-                            requestBody.parent = { id: this.categoryForm.parentId };
+                            requestBody.parentId = this.categoryForm.parentId;
                         }
                         
                         await fetch(url, {

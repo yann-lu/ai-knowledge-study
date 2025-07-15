@@ -3,6 +3,7 @@ package com.memory.app.service.impl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.memory.app.config.ReviewStrategyConfig;
 import com.memory.app.model.Knowledge;
 import com.memory.app.model.ReviewPlan;
 import com.memory.app.model.dto.ReviewDTO;
@@ -26,6 +27,7 @@ import java.util.stream.Collectors;
 public class ReviewPlanServiceImpl implements ReviewPlanService {
 
     private final ReviewPlanRepository reviewPlanRepository;
+    private final ReviewStrategyConfig reviewStrategyConfig;
 
     @Override
     @Transactional
@@ -58,6 +60,19 @@ public class ReviewPlanServiceImpl implements ReviewPlanService {
     @Override
     @Transactional
     public void handleNotMastered(Long knowledgeId) {
+        ReviewStrategyConfig.NotMasteredStrategy strategy = reviewStrategyConfig.getNotMastered();
+        
+        if (strategy == ReviewStrategyConfig.NotMasteredStrategy.RESTART_FROM_TOMORROW) {
+            handleNotMasteredWithRestart(knowledgeId);
+        } else if (strategy == ReviewStrategyConfig.NotMasteredStrategy.ADD_EXTRA_REVIEWS) {
+            handleNotMasteredWithExtraReviews(knowledgeId);
+        }
+    }
+    
+    /**
+     * 原策略：从明天重新开始复习计划
+     */
+    private void handleNotMasteredWithRestart(Long knowledgeId) {
         // 删除所有现有的复习计划
         List<ReviewPlan> existingPlans = reviewPlanRepository.findByKnowledgeId(knowledgeId);
         if (!existingPlans.isEmpty()) {
@@ -82,6 +97,51 @@ public class ReviewPlanServiceImpl implements ReviewPlanService {
 
         reviewPlanRepository.saveAll(plans);
         log.info("为知识点 {} 重新生成了 {} 次复习计划，从明天开始", knowledgeId, plans.size());
+    }
+    
+    /**
+     * 新策略：增加额外复习次数，原计划顺延
+     */
+    private void handleNotMasteredWithExtraReviews(Long knowledgeId) {
+        List<ReviewPlan> existingPlans = reviewPlanRepository.findByKnowledgeId(knowledgeId);
+        
+        // 获取所有未完成的复习计划，按计划日期排序
+        List<ReviewPlan> pendingPlans = existingPlans.stream()
+                .filter(plan -> plan.getStatus() == ReviewPlan.ReviewStatus.PENDING)
+                .sorted((p1, p2) -> p1.getScheduledDate().compareTo(p2.getScheduledDate()))
+                .collect(Collectors.toList());
+        
+        LocalDate today = LocalDate.now();
+        int extraReviewCount = reviewStrategyConfig.getExtraReviewCount();
+        
+        // 将所有未完成的复习计划顺延指定天数
+        for (ReviewPlan plan : pendingPlans) {
+            plan.setScheduledDate(plan.getScheduledDate().plusDays(extraReviewCount));
+        }
+        
+        // 获取Knowledge对象用于创建额外复习计划
+        Knowledge knowledge = null;
+        if (!existingPlans.isEmpty()) {
+            knowledge = existingPlans.get(0).getKnowledge();
+        }
+        
+        // 创建额外的复习计划
+        List<ReviewPlan> extraPlans = new ArrayList<>();
+        for (int i = 1; i <= extraReviewCount; i++) {
+            ReviewPlan extraPlan = new ReviewPlan();
+            extraPlan.setKnowledge(knowledge);
+            extraPlan.setReviewStage(0); // 标记为额外复习
+            extraPlan.setScheduledDate(today.plusDays(i));
+            extraPlan.setStatus(ReviewPlan.ReviewStatus.PENDING);
+            extraPlans.add(extraPlan);
+        }
+        
+        // 保存所有变更
+        reviewPlanRepository.saveAll(pendingPlans);
+        reviewPlanRepository.saveAll(extraPlans);
+        
+        log.info("为知识点 {} 增加了 {} 次额外复习，原有 {} 个复习计划顺延 {} 天", 
+                knowledgeId, extraReviewCount, pendingPlans.size(), extraReviewCount);
     }
 
     private static final Logger log = LoggerFactory.getLogger(ReviewPlanServiceImpl.class);
